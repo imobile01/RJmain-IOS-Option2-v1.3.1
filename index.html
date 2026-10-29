@@ -1498,7 +1498,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.12 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.13 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2304,8 +2304,8 @@ $("wpFile").onchange=function(){
   rd.readAsDataURL(f);inp.value="";
 };
 applyWp();
-/* ===== Device Sync (Firebase Realtime Database) — v10.1: up to 3 Main devices + 30 connected (Other) devices ===== */
-var SYNC_MAX_MAIN=3,SYNC_MAX_OTHER=30,SYNC_MAX=33,syncES=null,syncTok=null,syncTokExp=0,syncState="off",syncR={recs:{},lists:{},hist:{},devices:{}},syncT=null,syncApplyT=null,syncBusy=false,syncLastErr="",syncLastAt=0;
+/* ===== Device Sync (Firebase Realtime Database) — 12.13: up to 5 Main devices + 30 connected (Other) devices ===== */
+var SYNC_MAX_MAIN=5,SYNC_MAX_OTHER=30,SYNC_MAX=35,syncES=null,syncTok=null,syncTokExp=0,syncState="off",syncR={recs:{},lists:{},hist:{},devices:{}},syncT=null,syncApplyT=null,syncBusy=false,syncLastErr="",syncLastAt=0;
 var syncOff=parseInt(lsGet("syncOff","0"),10)||0,syncLastEv=0;
 function sNow(){return Date.now()+syncOff}
 function syncSetOff(t){if(typeof t==="number"&&t>1e12){syncOff=t-Date.now();try{localStorage.setItem("syncOff",String(syncOff))}catch(x){}}}
@@ -2538,7 +2538,7 @@ function renderSync(){
     iw.textContent=okC?"✓ Background sending is ON. This device hands the pay period, Agecare and backup emails to your Google sender link, which sends them at 23:59 by itself — even when RJ ShiftLog is closed or the phone is off. Open the app now and then so the latest records are uploaded (it also uploads every time you add or change a record).":
       (!lsGet("autoUrl","")?"ℹ️ To send in the background from this device, set up the email sender link (built-in email sender).":"ℹ️ To send in the background from this device, update your Google email sender script to v3 (Code.gs) and run its setup once. Until then, the 23:59 emails go out the next time RJ ShiftLog is opened here.");W.appendChild(iw);
     if(!okC&&lsGet("autoUrl",""))cloudRefresh().then(function(){if(cloudVer>=3)renderSync()})}
-  var mn=document.createElement("p");mn.className="subnote";mn.textContent="RJ ShiftLog is always a Main device (up to 3). Main devices send the automatic emails (pay period, Agecare, backup) and clear Names at cut-off — each email still goes out only once. Give all Main devices the same email settings. Staff use RJ Connect (up to 30 devices).";W.appendChild(mn);
+  var mn=document.createElement("p");mn.className="subnote";mn.textContent="RJ ShiftLog is always a Main device (up to 5). Main devices send the automatic emails (pay period, Agecare, backup) and clear Names at cut-off — each email still goes out only once. Give all Main devices the same email settings. Staff use RJ Connect (up to 30 devices).";W.appendChild(mn);
   fbBuiltIn();var adv={open:false};
   var th=document.createElement("h3");th.textContent="Team code (built in)";W.appendChild(th);
   var tv=document.createElement("div");tv.className="subsum";tv.innerHTML="<span>Team</span><b></b>";tv.lastChild.textContent=TEAM_CODE;W.appendChild(tv);
