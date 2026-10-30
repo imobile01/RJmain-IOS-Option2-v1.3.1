@@ -1547,7 +1547,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.21 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.23 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2503,12 +2503,12 @@ function syncStart(){
   syncState="connecting";syncUi();
   syncToken().then(function(t){
     return syncReq("GET","/devices").then(function(dv){
-      dv=dv||{};var me=syncDevId(),ids=Object.keys(dv).filter(function(k){return k!==me});
+      dv=dv||{};var me=syncDevId();if(dv[me]&&dv[me].removed){rmHere();throw "This device was removed from the team by another Main device."}var ids=Object.keys(dv).filter(function(k){return k!==me&&dv[k]&&!dv[k].removed});
       try{localStorage.removeItem("syncShC")}catch(x){}
       var iMain=lsGet("syncMain","")==="1",oM=ids.filter(function(k){return dv[k]&&dv[k].main}).length,oO=ids.length-oM;
       if(iMain&&oM>=SYNC_MAX_MAIN)throw "This team already has "+SYNC_MAX_MAIN+" Main devices. Remove one first on another Main (Device Sync → Devices list → ✕).";
       if(!iMain&&oO>=SYNC_MAX_OTHER)throw "This team already has "+SYNC_MAX_OTHER+" connected devices. Remove one first (Device Sync → Devices list → ✕).";
-      return syncReq("PUT","/devices/"+me,{name:lsGet("syncDevName","")||"Device",main:lsGet("syncMain","")==="1",seen:{".sv":"timestamp"}}).then(function(r){syncSetOff(r&&r.seen)});
+      try{localStorage.removeItem("rmTeam")}catch(x){}return syncReq("PUT","/devices/"+me,{name:lsGet("syncDevName","")||"Device",main:lsGet("syncMain","")==="1",seen:{".sv":"timestamp"}}).then(function(r){syncSetOff(r&&r.seen)});
     }).then(function(){
       if(myGen!==syncGen)return;
       var es=new EventSource(syncBase()+".json?auth="+encodeURIComponent(t));syncES=es;
@@ -2606,14 +2606,24 @@ function renderSync(){
   W.appendChild(bt);
   if(on){
     var sn=document.createElement("button");sn.type="button";sn.className="hb";sn.style.alignSelf="flex-start";sn.textContent="↻ Sync now";sn.onclick=function(){syncPush().then(function(){toast("Synced",true)})};W.appendChild(sn);
-    var dh=document.createElement("h3");var dv0=syncR.devices||{},kk=Object.keys(dv0).filter(function(k){return dv0[k]}),nM=kk.filter(function(k){return dv0[k].main}).length;dh.textContent="Devices in this team — ⭐ Main "+nM+"/"+SYNC_MAX_MAIN;W.appendChild(dh);
-    var box=document.createElement("div");box.className="elist";var dv=syncR.devices||{},me=syncDevId(),ks=Object.keys(dv).filter(function(k){return dv[k]&&(dv[k].main||k===me)});
+    var dh=document.createElement("h3");var dv0=syncR.devices||{},kk=Object.keys(dv0).filter(function(k){return dv0[k]&&!dv0[k].removed}),nM=kk.filter(function(k){return dv0[k].main}).length;dh.textContent="Devices in this team — ⭐ Main "+nM+"/"+SYNC_MAX_MAIN;W.appendChild(dh);
+    var box=document.createElement("div");box.className="elist";var dv=syncR.devices||{},me=syncDevId(),ks=Object.keys(dv).filter(function(k){return dv[k]&&!dv[k].removed&&(dv[k].main||k===me)});
     if(!ks.length){var em=document.createElement("div");em.className="empty";em.textContent="—";box.appendChild(em)}
     ks.forEach(function(k){var d=dv[k]||{},r=document.createElement("div");r.className="erow";var t=document.createElement("span");
       var live=Date.now()-(d.seen||0)<150000;t.textContent=(live?"🟢 ":"⚪ ")+(d.name||"Device")+(d.main?" · ⭐ Main":"")+(k===me?" (this device)":"");r.appendChild(t);
-      if(k!==me){var x=document.createElement("button");x.type="button";x.className="nx";x.textContent="✕";x.setAttribute("aria-label","Remove device");x.onclick=function(){choose2("Remove “"+(d.name||"Device")+"” from the team?","Remove","Cancel",function(){syncReq("DELETE","/devices/"+k).then(function(){delete syncR.devices[k];renderSync()})},function(){})};r.appendChild(x)}
+      if(k!==me){var x=document.createElement("button");x.type="button";x.className="nx";x.textContent="✕";x.setAttribute("aria-label","Remove device");x.onclick=function(){choose2("Remove “"+(d.name||"Device")+"” from the team permanently?\n\nThat device is disconnected right away and stays out of the team, even if it is opened again. (You can allow it again under Removed devices.)","Remove","Cancel",function(){
+        syncReq("PUT","/devices/"+k,{name:d.name||"Device",main:true,removed:true,at:{".sv":"timestamp"}}).then(function(){syncR.devices[k]={name:d.name||"Device",main:true,removed:true};
+          var P=syncR.push||{};Object.keys(P).forEach(function(id){if(id===k){delete P[id];syncReq("DELETE","/push/"+id).catch(function(){})}});
+          toast("“"+(d.name||"Device")+"” removed permanently",true);renderSync()},function(e){toast("Couldn't remove: "+e)})},function(){})};r.appendChild(x)}
       box.appendChild(r)});
     W.appendChild(box);
+    var rk=Object.keys(dv).filter(function(k){return dv[k]&&dv[k].removed&&k!==me});
+    if(rk.length){var rh=document.createElement("div");rh.className="schsec";rh.style.margin="10px 4px 4px";rh.textContent="Removed devices ("+rk.length+")";W.appendChild(rh);
+      var rb=document.createElement("div");rb.className="elist";
+      rk.forEach(function(k){var d=dv[k],r=document.createElement("div");r.className="erow";var t=document.createElement("span");t.textContent="⛔ "+(d.name||"Device");t.style.opacity=".6";r.appendChild(t);
+        var a=document.createElement("button");a.type="button";a.className="nx";a.textContent="↩︎";a.title="Allow "+(d.name||"Device")+" again";a.style.color="#34c759";
+        a.onclick=function(){choose2("Allow “"+(d.name||"Device")+"” to join the team again?\n\nIt reconnects when Device Sync is turned on there.","Allow","Cancel",function(){syncReq("DELETE","/devices/"+k).then(function(){delete syncR.devices[k];toast("“"+(d.name||"Device")+"” can join again",true);renderSync()},function(e){toast("Couldn't change: "+e)})},function(){})};
+        r.appendChild(a);rb.appendChild(r)});W.appendChild(rb)}
     /* v10.9: RJ Connect staff accounts (name + password): reset password / delete account / allow again */
     var uh=document.createElement("h3");var us=syncR.users||{},uk=Object.keys(us).filter(function(k){return us[k]&&us[k].name}).sort(function(a,b){return us[a].name.localeCompare(us[b].name)});
     var nAct=uk.filter(function(k){return !us[k].deleted}).length;
@@ -2656,12 +2666,13 @@ function renderSync(){
         var bx=document.createElement("span");bx.style.display="flex";bx.style.alignItems="center";bx.style.flex="0 0 auto";
         var al=mkb("↩︎","Allow "+u.name+" again","#34c759");
         al.onclick=function(){choose2("Allow “"+u.name+"” to sign in to RJ Connect again?\n\nThey will create a new password at their next sign-in.","Allow","Cancel",function(){syncReq("DELETE","/users/"+k).then(function(){delete syncR.users[k];toast(u.name+" can sign in again",true);renderSync()},function(e){toast("Couldn't change: "+e)})},function(){})};
-        var rm=mkb("✕","Remove "+u.name+" from Trash","#ff3b30");
-        rm.onclick=function(){choose2("Remove “"+u.name+"” from Trash?\n\nThe account is erased from the list. Their saved shifts stay in Records. (The name becomes free, so someone could create a new account with it.)","Remove","Cancel",function(){syncReq("DELETE","/users/"+k).then(function(){delete syncR.users[k];toast(u.name+" removed from Trash",true);renderSync()},function(e){toast("Couldn't remove: "+e)})},function(){})};
+        var rm=mkb("✕","Delete "+u.name+" permanently","#ff3b30");
+        rm.onclick=function(){var c=staffCount(u.name);
+          choose2("Delete “"+u.name+"” permanently?\n\nThis erases ALL of their data:\n• "+c.recs+" shift record"+(c.recs===1?"":"s")+" (Records + Saved Data)\n• "+c.sched+" schedule"+(c.sched===1?"":"s")+"\n• their chat ("+c.chat+" message"+(c.chat===1?"":"s")+")\n• their phone sign-in and notifications\n• the name in Entry → Names\n\nThis can't be undone. If you may need these records for pay, make a System Backup first.\nIf they sign in again with this name, they start a brand-new profile.","Delete forever","Cancel",function(){staffPurge(k,u)},function(){})};
         bx.appendChild(al);bx.appendChild(rm);r.appendChild(bx);tb2.appendChild(r)});
       W.appendChild(tb2);
     }
-    var un=document.createElement("p");un.className="subnote";un.textContent="Each staff member signs in to RJ Connect with their full name and a password. Nobody else can sign in with that name. Tap ↺ if someone forgets their password, or 🗑 to delete an account (e.g. when someone leaves). Deleted accounts go to Trash, where you can allow them again (↩︎) or remove them from the list (✕).";W.appendChild(un);
+    var un=document.createElement("p");un.className="subnote";un.textContent="Each staff member signs in to RJ Connect with their full name and a password. Nobody else can sign in with that name. Tap ↺ if someone forgets their password, or 🗑 to delete an account (e.g. when someone leaves). Deleted accounts go to Trash, where you can allow them again (↩︎) or delete them permanently with all their data (✕).";W.appendChild(un);
     if(syncLastAt){var la=document.createElement("p");la.className="subnote";la.textContent="Last sync: "+new Date(syncLastAt).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});W.appendChild(la)}
   }
   var nt=document.createElement("p");nt.className="subnote";nt.textContent="Shared between devices: records in Names, Saved Data, names, floors, sides, companions and STAT dates. Each device keeps its own PIN, wallpaper and email settings. Changes appear on the other devices within about a second when online; offline changes sync when the internet comes back.";W.appendChild(nt);
@@ -3141,6 +3152,58 @@ setTimeout(bdgSet,1500);
       w.innerHTML='<span class="eic">🖼️</span><span class="fn"><b>Wallpaper</b><small>Change the background picture</small></span><span class="chev">›</span>';
       w.onclick=function(){renderWp();$("wsheet").classList.add("open")};M.appendChild(w)}}catch(x){}return r};
 })();
+</script>
+
+<script>
+/* ===== 12.22: delete a staff member permanently — account, phone sign-in, push, chat, schedules, records, Saved Data rows, Names entry ===== */
+function staffSame(nm){var l=String(nm||"").trim().toLowerCase().replace(/\s+/g," ");return function(x){return String(x||"").trim().toLowerCase().replace(/\s+/g," ")===l}}
+function staffCount(nm){var same=staffSame(nm),n=0,s=0,c=0,uk=null,us=(syncR&&syncR.users)||{};
+  saved.forEach(function(r){if(same(r.name))n++});loadSaved().forEach(function(h){(h.recs||[]).forEach(function(r){if(same(r.name))n++})});
+  var o=(syncR&&syncR.sched)||{};Object.keys(o).forEach(function(k){if(o[k]&&same(o[k].name))s++});
+  Object.keys(us).forEach(function(k){if(us[k]&&same(us[k].name))uk=k});if(uk&&syncR.chat&&syncR.chat[uk])c=Object.keys(syncR.chat[uk]).length;
+  return {recs:n,sched:s,chat:c}}
+function staffPurge(k,u){
+  var same=staffSame(u.name),J=[],cnt=staffCount(u.name);
+  /* records (Records → Names) */
+  saved=saved.filter(function(r){return !same(r.name)});persist();
+  /* Saved Data: remove their rows from each saved period (and periods that only had them) */
+  var H=loadSaved(),H2=[];H.forEach(function(h){if(!h.recs){H2.push(h);return}var keep=h.recs.filter(function(r){return !same(r.name)});
+    if(keep.length===h.recs.length){H2.push(h);return}if(!keep.length)return;
+    h.recs=keep;h.names=(h.names||[]).filter(function(n){return !same(n)});var t=0;keep.forEach(function(r){t+=dur(r)});h.hrs=t;H2.push(h)});
+  storeSaved(H2);
+  /* Entry → Names */
+  pnames=pnames.filter(function(n){return !same(n)});savePNames();try{if(same($("pname").value))setPName("")}catch(x){}try{renderEntry()}catch(x){}
+  try{render()}catch(x){}
+  /* send the Records / Saved Data deletions FIRST, then remove the rest (otherwise sync can bring the records back) */
+  o2Flush(function(){
+  /* schedules */
+  var o=syncR.sched||{};Object.keys(o).forEach(function(id){if(o[id]&&same(o[id].name)){try{schMoved[id]=1}catch(x){}delete o[id];J.push(syncReq("DELETE","/sched/"+id))}});try{schCacheSave()}catch(x){}
+  /* chat + read marks */
+  if(syncR.chat)delete syncR.chat[k];if(syncR.chatSeen)delete syncR.chatSeen[k];J.push(syncReq("DELETE","/chat/"+k));J.push(syncReq("DELETE","/chatSeen/"+k));
+  /* push notifications for that account */
+  var P=syncR.push||{};Object.keys(P).forEach(function(id){if(P[id]&&P[id].u===k){delete P[id];J.push(syncReq("DELETE","/push/"+id))}});
+  /* their phone(s) */
+  var dv=syncR.devices||{};Object.keys(dv).forEach(function(id){var d=dv[id];if(d&&!d.main&&same(d.name)){delete dv[id];J.push(syncReq("DELETE","/devices/"+id))}});
+  /* the account itself (last) -> their phone is signed out and reset */
+  J.push(syncReq("DELETE","/users/"+k));
+  Promise.all(J.map(function(p){return p.catch(function(e){throw e})})).then(function(){
+    delete syncR.users[k];toast(u.name+" deleted permanently ("+cnt.recs+" records, "+cnt.sched+" schedules, chat)",true);renderSync()},
+    function(e){toast("Some data couldn't be deleted (check the internet), try again: "+e);renderSync()});
+  });
+}
+</script>
+
+<script>
+/* ===== 12.23: a Main removed from "Devices in this team" stays removed ===== */
+function rmHere(){try{localStorage.setItem("rmTeam","1");localStorage.removeItem("syncOn")}catch(x){}
+  try{syncStop()}catch(x){}syncState="off";
+  try{choose2("This device was removed from the team by another Main device.\n\nSync is now off. To join again, ask that Main to allow it (Device Sync → Removed devices → ↩︎), then turn Device Sync on here.","OK","Close",function(){},function(){})}catch(x){}
+  try{renderSync()}catch(x){}}
+var _rmAp=syncApply;syncApply=function(){var r=_rmAp.apply(this,arguments);try{var d=syncR&&syncR.devices&&syncR.devices[syncDevId()];if(d&&d.removed&&syncOn())rmHere()}catch(x){}return r};
+var _rmRS=renderSync;renderSync=function(){var r=_rmRS.apply(this,arguments);try{
+  if(localStorage.getItem("rmTeam")==="1"&&!syncOn()){var W=document.querySelector("#entWrap .sub")||$("list");var n=document.createElement("p");n.className="subnote";n.style.color="#ff3b30";n.style.fontWeight="700";
+    n.textContent="⛔ This device was removed from the team by another Main device. Ask that Main to allow it again (Device Sync → Removed devices → ↩︎), then turn Device Sync on here.";
+    var host=$("syncBox");if(host)host.insertBefore(n,host.firstChild)}}catch(x){}return r};
 </script>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}</script>
 </body>
