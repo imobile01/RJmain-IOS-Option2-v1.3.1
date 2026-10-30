@@ -1507,7 +1507,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.15 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.18 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2345,6 +2345,7 @@ function shadow(k){try{return JSON.parse(lsGet(k,"{}"))}catch(x){return {}}}
 function shadowSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(x){}}
 function newTeamCode(){var a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",s="";var r=new Uint8Array(24);(window.crypto||{}).getRandomValues?crypto.getRandomValues(r):r.forEach(function(_,i){r[i]=Math.random()*256});for(var i=0;i<24;i++){s+=a[r[i]%a.length];if(i%4===3&&i<23)s+="-"}return s}
 /* --- Firebase anonymous sign-in (REST, no SDK) --- */
+var syncGen=0;
 function syncToken(){
   if(syncTok&&Date.now()<syncTokExp-120000)return Promise.resolve(syncTok);
   var key=lsGet("syncKey",""),rt=lsGet("syncRefresh","");
@@ -2353,7 +2354,7 @@ function syncToken(){
         :fetch("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key="+encodeURIComponent(key),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({returnSecureToken:true})})
           .then(function(r){return r.json()}).then(function(j){if(!j.idToken)throw (j.error&&j.error.message)||"sign-in failed (is Anonymous sign-in enabled?)";return {t:j.idToken,r:j.refreshToken,e:j.expiresIn}});
   return p.then(function(o){syncTok=o.t;syncTokExp=Date.now()+parseInt(o.e||"3600",10)*1000;try{localStorage.setItem("syncRefresh",o.r)}catch(x){}return syncTok},
-    function(e){if(rt){try{localStorage.removeItem("syncRefresh")}catch(x){}}throw e});
+    function(e){if(rt&&navigator.onLine&&!/Failed to fetch|Load failed|NetworkError/i.test(String(e))){try{localStorage.removeItem("syncRefresh")}catch(x){}}throw e});
 }
 function syncReq(method,path,body){
   return syncToken().then(function(t){
@@ -2458,7 +2459,7 @@ function syncStop(){if(syncES){try{syncES.close()}catch(x){}syncES=null}syncStat
 function syncStart(){
   try{var tp=teamPath(lsGet("syncTeam",""));if(syncOn()&&!lsGet("syncPath","")&&lsGet("syncTeam","")===tp)localStorage.setItem("syncPath",tp);
   if(syncOn()&&lsGet("syncPath","")!==tp){["syncShR","syncShL","syncShH","syncShC"].forEach(function(k){localStorage.removeItem(k)});Object.keys(SYNC_LISTS).forEach(function(k){localStorage.removeItem("syncLU_"+k)});localStorage.setItem("syncPath",tp)}}catch(x){}
-  syncStop();if(!syncOn()||typeof EventSource==="undefined"){syncUi();return}
+  var myGen=++syncGen;syncStop();if(!syncOn()||typeof EventSource==="undefined"){syncUi();return}
   syncState="connecting";syncUi();
   syncToken().then(function(t){
     return syncReq("GET","/devices").then(function(dv){
@@ -2469,6 +2470,7 @@ function syncStart(){
       if(!iMain&&oO>=SYNC_MAX_OTHER)throw "This team already has "+SYNC_MAX_OTHER+" connected devices. Remove one first (Device Sync → Devices list → ✕).";
       return syncReq("PUT","/devices/"+me,{name:lsGet("syncDevName","")||"Device",main:lsGet("syncMain","")==="1",seen:{".sv":"timestamp"}}).then(function(r){syncSetOff(r&&r.seen)});
     }).then(function(){
+      if(myGen!==syncGen)return;
       var es=new EventSource(syncBase()+".json?auth="+encodeURIComponent(t));syncES=es;
       function ev(merge){return function(e){var m;try{m=JSON.parse(e.data)}catch(x){return}if(!m)return;
         if(m.path==="/"&&!merge){syncR={recs:{},lists:{},hist:{},devices:{},cfg:null};setAt(syncR,"/",m.data||{},true);["recs","lists","hist","devices"].forEach(function(k){if(!syncR[k])syncR[k]={}})}
@@ -2480,7 +2482,7 @@ function syncStart(){
       es.onerror=function(){if(syncState==="live"){syncState="offline";syncUi()}};
       es.onopen=function(){syncLastEv=Date.now();syncState="live";syncLastErr="";syncUi()};
     });
-  }).catch(function(e){syncLastErr=String(e);syncState="offline";syncUi()});
+  }).catch(function(e){if(myGen!==syncGen)return;syncLastErr=String(e);syncState="offline";syncUi()});
 }
 setInterval(function(){
   if(!syncOn())return;
@@ -2901,7 +2903,7 @@ function chRender(force){
 $("chBack").onclick=function(){chOpen=null;chLSig="";chRender(true)};
 function chAlert(uk,m){var us=(syncR&&syncR.users)||{},nm=(us[uk]&&us[uk].name)||m.n||"Staff";
   toast("💬 "+nm+": "+m.t.replace(/\s+/g," ").slice(0,70),true);try{if(navigator.vibrate)navigator.vibrate([100,50,100])}catch(x){}
-  try{if(window.RJAndroid&&RJAndroid.notifyShift)RJAndroid.notifyShift("💬 "+nm,m.t.slice(0,300))}catch(x){}}
+  try{if(window.RJAndroid&&RJAndroid.notifyShift)RJAndroid.notifyShift(nm,m.t.slice(0,300))}catch(x){}}
 /* messages older than 30 days are removed (by the Main) */
 function chClean(){if(!syncOn()||syncState!=="live")return;var cut=sNow()-CH_KEEP,all=chAll();Object.keys(all).forEach(function(uk){var p={};Object.keys(all[uk]||{}).forEach(function(id){var m=all[uk][id];if(m&&typeof m.at==="number"&&m.at<cut)p[id]=null});if(Object.keys(p).length)syncReq("PATCH","/chat/"+uk,p).catch(function(){})})}
 setInterval(chClean,600000);setTimeout(chClean,15000);
@@ -2983,8 +2985,8 @@ function pushSlot(el){var c=document.createElement("div");c.className="pushcard"
 /* ---- hooks: what sends a push ---- */
 var _pushChSend=chSend;chSend=function(uk,text){var ok=_pushChSend.apply(this,arguments);
   if(ok){var t=String(text).trim().slice(0,300);
-    if(PUSH_ROLE==="m")pushToStaff(uk,"💬 Message from the office",t,"chat");
-    else pushToMains("💬 "+(myName()||"Staff"),t,"chat")}
+    if(PUSH_ROLE==="m")pushToStaff(uk,"Office",t,"chat");
+    else pushToMains(myName()||"Staff",t,"chat")}
   return ok};
 var _pushReq=syncReq;syncReq=function(method,path,body){
   var p=_pushReq.apply(this,arguments),m=/^\/sched\/([^\/]+)$/.exec(path||"");
@@ -3011,6 +3013,60 @@ function pushCheck(){if(Date.now()-pushChkAt<60000||syncState!=="live")return;pu
   if(pushSupported()&&pushConfigured()&&Notification.permission==="granted"&&(!pushIOS()||pushStandalone()))pushRegister(false).catch(function(){})}
 var _pushAp2=syncApply;syncApply=function(){var r=_pushAp2.apply(this,arguments);try{pushCheck()}catch(x){}return r};
 pushCards();
+</script>
+<script>
+/* ===== Stay connected (Main 12.16 / RJ Connect 2.9): reconnect on open, on return from background, when the internet comes back,
+   and keep retrying quickly (1.5s → 30s) until live — instead of waiting a whole minute ===== */
+var kaT=null,kaN=0,kaAt=0;
+function kaLive(){return syncState==="live"&&syncES&&syncES.readyState!==2}
+function kaKick(reset){
+  if(reset)kaN=0;clearTimeout(kaT);if(!syncOn())return;
+  kaT=setTimeout(function(){
+    if(!syncOn()||kaLive()){kaN=0;return}
+    if(syncState!=="connecting"||Date.now()-kaAt>12000){kaAt=Date.now();syncStart()}   /* a start that hangs >12s is restarted */
+    kaN++;kaKick(false)},[1500,3000,5000,8000,15000,30000][Math.min(kaN,5)])}
+function kaWake(){if(!syncOn())return;kaN=0;if(!kaLive()||Date.now()-syncLastEv>45000){kaAt=Date.now();syncStart()}kaKick(true)}
+var _kaUi=syncUi;syncUi=function(){var r=_kaUi.apply(this,arguments);try{if(syncOn()&&syncState==="offline")kaKick(false)}catch(x){}return r};
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")kaWake()});
+window.addEventListener("pageshow",kaWake);window.addEventListener("focus",kaWake);window.addEventListener("online",kaWake);
+/* watchdog: if the live connection silently died while the app is on screen, reconnect */
+setInterval(function(){if(document.visibilityState==="visible"&&syncOn()&&!kaLive()&&syncState!=="connecting")kaWake()},15000);
+/* backup: while the live connection is not up (and the app is on screen), quietly fetch new schedules + chat every 8 s,
+   and right away when the app opens — so nothing waits for a "Sync now" */
+var kaPT=null,kaBusy=false;
+function kaLight(){
+  if(kaBusy||!syncOn()||kaLive())return;kaBusy=true;
+  var staff=typeof C_TEAM!=="undefined",uk=staff?(LS.getItem("acctKey")||""):"";
+  if(staff&&!uk){kaBusy=false;return}
+  var J=[syncReq("GET","/sched"),syncReq("GET",staff?"/chat/"+uk:"/chat"),syncReq("GET",staff?"/chatSeen/"+uk:"/chatSeen")];
+  if(staff)J.push(syncReq("GET","/users/"+uk));
+  Promise.all(J).then(function(r){
+    syncR.sched=r[0]||{};
+    if(staff){syncR.chat=syncR.chat||{};syncR.chat[uk]=r[1]||{};syncR.chatSeen=syncR.chatSeen||{};syncR.chatSeen[uk]=r[2]||{};syncR.users=syncR.users||{};if(r[3])syncR.users[uk]=r[3]}
+    else{syncR.chat=r[1]||{};syncR.chatSeen=r[2]||{}}
+    try{schCacheSave()}catch(x){}syncApply()}).catch(function(){}).then(function(){kaBusy=false})}
+setInterval(function(){if(document.visibilityState==="visible")kaLight()},8000);
+var _kaWake=kaWake;kaWake=function(){_kaWake.apply(this,arguments);setTimeout(kaLight,300)};
+if(syncOn())kaKick(true);
+</script>
+<script>
+/* ===== App-icon badge (red number on the Home Screen icon, like Messenger) — iPhone Home Screen app (iOS 16.4+, notifications allowed)
+   Staff: unread office messages + unread schedule alerts.  Main: unread staff messages + new confirmed shifts. ===== */
+var BDG_KEY="badge:"+new URL("./",location.href).href;
+function mConfSeen(){var v=parseInt(CH_LS.getItem("confSeenAt")||"0",10);if(!v){v=sNow();try{CH_LS.setItem("confSeenAt",String(v))}catch(x){}}return v}
+function mConfUnread(){var t=mConfSeen();try{return schList().filter(function(e){return e.status==="confirmed"&&(e.confAt||0)>t}).length}catch(x){return 0}}
+function bdgCount(){var n=0;
+  try{if(CH_ROLE==="m")chStaff().forEach(function(s){n+=s.un});else{var uk=chCur();if(uk)n+=chUnread(uk)}}catch(x){}
+  try{n+=CH_ROLE==="s"?o2Unread():mConfUnread()}catch(x){}return n}
+var bdgLast=-1;
+function bdgSet(){var n=bdgCount();if(n===bdgLast)return;bdgLast=n;
+  try{if(navigator.setAppBadge){if(n)navigator.setAppBadge(n).catch(function(){});else navigator.clearAppBadge().catch(function(){})}}catch(x){}
+  try{if(window.caches)caches.open(BDG_KEY).then(function(c){return c.put("n",new Response(String(n)))}).catch(function(){})}catch(x){}}
+if(CH_ROLE==="m"){var _bdgSF=renderSchedFolder;renderSchedFolder=function(){try{CH_LS.setItem("confSeenAt",String(sNow()))}catch(x){}var r=_bdgSF.apply(this,arguments);bdgSet();return r}}
+var _bdgAp=syncApply;syncApply=function(){var r=_bdgAp.apply(this,arguments);try{bdgSet()}catch(x){}return r};
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"){bdgLast=-1;setTimeout(bdgSet,800)}});
+setInterval(function(){try{bdgSet()}catch(x){}},3000);
+setTimeout(bdgSet,1500);
 </script>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}</script>
 </body>
