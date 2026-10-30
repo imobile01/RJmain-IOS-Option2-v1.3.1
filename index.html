@@ -446,8 +446,17 @@ button,select,input,#pad button{touch-action:manipulation}
   </section>
 
 
+  <section class="screen" id="s-chat">
+    <div class="hd"><div class="ttl"><button class="hb back" id="chBack" type="button" hidden>‹ Chat</button><h1 id="chTitle">Chat</h1></div></div>
+    <div class="sub" id="chSub"></div>
+    <div id="chList" class="chlist"></div>
+    <div id="chThread" class="chthread" hidden><div id="chMsgs" class="chmsgs"></div>
+      <div class="chbar"><textarea id="chIn" rows="1" maxlength="1000" placeholder="Message…" enterkeyhint="send"></textarea><button id="chSend" type="button">Send</button></div></div>
+  </section>
+
   <nav class="tabs" id="tabs">
     <button class="on" data-s="new"><span>🗓️</span>Schedule</button>
+    <button data-s="chat"><span>💬</span>Chat<b id="chBadge" class="chbadge" hidden></b></button>
     <button data-s="rec"><span>📋</span>Records</button>
   </nav>
 </div>
@@ -1498,7 +1507,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.13 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.15 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2483,7 +2492,7 @@ setInterval(function(){
 },60000);
 window.addEventListener("online",function(){if(syncOn())syncStart()});
 /* v9.3: full re-check (in case the live connection silently dropped) + reconnect when the app comes back on screen */
-function syncPull(){if(!syncOn())return Promise.resolve();return syncReq("GET","").then(function(d){d=d||{};syncR={recs:d.recs||{},lists:d.lists||{},hist:d.hist||{},devices:d.devices||{},cfg:d.cfg||null,users:d.users||{},sched:d.sched||{}};syncApply();syncDirty()}).catch(function(e){syncLastErr=String(e);syncUi()})}
+function syncPull(){if(!syncOn())return Promise.resolve();return syncReq("GET","").then(function(d){d=d||{};syncR={recs:d.recs||{},lists:d.lists||{},hist:d.hist||{},devices:d.devices||{},cfg:d.cfg||null,users:d.users||{},sched:d.sched||{},chat:d.chat||{},chatSeen:d.chatSeen||{},push:d.push||{}};syncApply();syncDirty()}).catch(function(e){syncLastErr=String(e);syncUi()})}
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"&&syncOn())syncStart()});
 window.addEventListener("pageshow",function(e){if(e.persisted&&syncOn())syncStart()});
 /* one-time fix for list timestamps saved with a wrong device clock */
@@ -2766,7 +2775,7 @@ function schProcess(){
   var o=(syncR&&syncR.sched)||{},have={},ch=false,cut=ymd(new Date(Date.now()-30*864e5));
   saved.forEach(function(r){have[r.id]=1});loadSaved().forEach(function(h){(h.recs||[]).forEach(function(r){have[r.id]=1})});
   Object.keys(o).forEach(function(k){var e=o[k];if(!e||!e.id)return;
-    if(e.status==="confirmed"&&!have[e.id]&&!schMoved[e.id]){schMoved[e.id]=1;saved.push({id:e.id,date:e.date,from:e.from,to:e.to,floor:e.floor,comp:e.comp||"",name:e.name,key:e.key||e.date});ch=true}
+    if(e.status==="confirmed"&&!have[e.id]&&!schMoved[e.id]){schMoved[e.id]=1;saved.push({id:e.id,date:e.date,from:e.from,to:e.to,floor:e.floor,comp:e.comp||"",name:e.name,key:e.key||e.date});ch=true;try{if(window.RJAndroid&&RJAndroid.notifyShift)RJAndroid.notifyShift("✅ "+(e.confBy||e.name)+" confirmed",schLbl(e))}catch(x){}}
     if(schCleared(e)&&(have[e.id]||schMoved[e.id])){delete o[k];syncReq("DELETE","/sched/"+k).catch(function(){})}   /* confirmed ones are cleared at 11:59 PM */
   });
   schCacheSave();
@@ -2776,6 +2785,232 @@ function schProcess(){
 setInterval(function(){try{schProcess()}catch(x){}},60000);
 try{if($("s-rec").classList.contains("on"))render()}catch(x){}
 var _schAp=syncApply;syncApply=function(){var r=_schAp.apply(this,arguments);try{schCacheSave();schProcess()}catch(x){}return r};
+</script>
+<style>
+#s-chat .hd .sub{font-size:13px;color:var(--mute);margin-top:-2px}
+.chlist{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:2px 0 8px}
+.chi{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:18px;padding:11px 12px;margin:0 0 8px;font:inherit;cursor:pointer}
+.chi .av{flex:0 0 42px;height:42px;border-radius:50%;background:linear-gradient(180deg,#3b8bff,#0a6cff);color:#fff;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center}
+.chi .ct{flex:1;min-width:0}.chi .ct b{display:block;font-size:16px}
+.chi .ct small{display:block;color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.chi .cr{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:12px;color:var(--mute)}
+.chi.unread .ct small{color:var(--text);font-weight:700}
+.chbadge{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:#ff3b30;color:#fff;font-size:11px;font-weight:800;padding:0 5px;margin-left:6px;vertical-align:middle;text-align:center}
+.chbadge[hidden]{display:none!important}
+.chthread{flex:1;min-height:0;display:flex;flex-direction:column}
+.chthread[hidden],.chlist[hidden]{display:none!important}
+.chmsgs{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:6px 2px;display:flex;flex-direction:column}
+.chb{max-width:80%;padding:8px 13px;border-radius:18px;margin:3px 0 1px;font-size:16px;line-height:1.32;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.chb.me{align-self:flex-end;background:#0a84ff;color:#fff;border-bottom-right-radius:6px}
+.chb.th{align-self:flex-start;background:var(--card);color:var(--text);border:1px solid var(--line);border-bottom-left-radius:6px}
+.cht{font-size:11px;color:var(--mute);margin:0 6px 5px}.cht.me{align-self:flex-end}.cht.th{align-self:flex-start}
+.chday{align-self:center;font-size:12px;color:var(--mute);margin:10px 0 4px;font-weight:700;background:rgba(127,140,170,.14);padding:3px 10px;border-radius:10px}
+.chempty{margin:auto;text-align:center;color:var(--mute);padding:30px 16px;font-size:15px}
+.chbar{display:flex;gap:8px;align-items:flex-end;padding:8px 0 4px}
+.chbar textarea{flex:1;resize:none;font:inherit;font-size:16px;line-height:1.3;padding:10px 14px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--text);max-height:120px;min-height:42px;box-sizing:border-box;outline:none}
+.chbar textarea:focus{border-color:#0a84ff}
+.chbar button{flex:0 0 auto;border:0;border-radius:20px;background:#0a84ff;color:#fff;font-weight:800;font-size:16px;padding:11px 16px}
+.chbar button:disabled{opacity:.45}
+</style>
+<script>
+/* ===== Option 2 chat: Main (office) <-> each RJ Connect staff account. Firebase: /chat/{account}/{msg}, /chatSeen/{account} ===== */
+var CH_LS=(typeof LS!=="undefined")?LS:localStorage,CH_ROLE=(typeof C_TEAM!=="undefined")?"s":"m",CH_KEEP=30*864e5,chOpen=null;
+function chAll(){return (syncR&&syncR.chat)||{}}
+function chSeenAll(){return (syncR&&syncR.chatSeen)||{}}
+function chMsgs(uk){var o=chAll()[uk]||{};return Object.keys(o).map(function(k){var m=o[k];if(!m||typeof m.t!=="string")return null;return {id:k,f:m.f,t:m.t,n:m.n||"",at:typeof m.at==="number"?m.at:sNow()}}).filter(Boolean).sort(function(a,b){return a.at-b.at||(a.id<b.id?-1:1)})}
+function chSeen(uk,who){var s=chSeenAll()[uk]||{};return typeof s[who]==="number"?s[who]:0}
+function chOther(){return CH_ROLE==="m"?"s":"m"}
+function chUnread(uk){var seen=chSeen(uk,CH_ROLE),o=chOther();return chMsgs(uk).filter(function(m){return m.f===o&&m.at>seen}).length}
+function chMe(){return CH_ROLE==="m"?(lsGet("syncDevName","")||"Office"):(myName()||"Staff")}
+function chSend(uk,text){
+  text=String(text||"").replace(/\s+$/,"").replace(/^\s+/,"").slice(0,1000);if(!text||!uk)return false;
+  if(!syncOn()){toast("Not connected — turn on sync first.");return false}
+  var id="c"+sNow().toString(36)+Math.random().toString(36).slice(2,6),me=chMe();
+  syncR.chat=syncR.chat||{};syncR.chat[uk]=syncR.chat[uk]||{};syncR.chat[uk][id]={f:CH_ROLE,t:text,n:me,at:sNow()};
+  chSetSeen(uk);
+  syncReq("PUT","/chat/"+uk+"/"+id,{f:CH_ROLE,t:text,n:me,at:{".sv":"timestamp"}}).catch(function(){try{delete syncR.chat[uk][id]}catch(x){}toast("Message not sent — check the internet and try again.");chRender()});
+  return true}
+function chSetSeen(uk){syncR.chatSeen=syncR.chatSeen||{};syncR.chatSeen[uk]=Object.assign({},syncR.chatSeen[uk]||{});syncR.chatSeen[uk][CH_ROLE]=sNow();var o={};o[CH_ROLE]={".sv":"timestamp"};syncReq("PATCH","/chatSeen/"+uk,o).catch(function(){})}
+function chDay(ms){var d=new Date(ms),t=new Date(),y=new Date(t.getFullYear(),t.getMonth(),t.getDate()-1);
+  if(d.toDateString()===t.toDateString())return "Today";if(d.toDateString()===y.toDateString())return "Yesterday";
+  return d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}
+function chTime(ms){return new Date(ms).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}
+function chShort(ms){var d=new Date(ms),t=new Date();return d.toDateString()===t.toDateString()?chTime(ms):chDay(ms)}
+var chSig="";
+function chThread(uk,force){
+  var box=$("chMsgs");if(!box)return;var L=chMsgs(uk),os=chSeen(uk,chOther());
+  var sig=uk+"|"+JSON.stringify(L.map(function(m){return [m.id,m.at]}))+"|"+os;if(!force&&sig===chSig)return;chSig=sig;
+  var atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<80;box.innerHTML="";
+  if(!L.length){var e=document.createElement("div");e.className="chempty";e.textContent=CH_ROLE==="m"?"No messages yet. Type below to message this staff member.":"No messages yet. Type below to message the office.";box.appendChild(e);return}
+  var lastDay="",lastMine=-1;L.forEach(function(m,i){if(m.f===CH_ROLE)lastMine=i});
+  L.forEach(function(m,i){
+    var dy=chDay(m.at);if(dy!==lastDay){lastDay=dy;var d=document.createElement("div");d.className="chday";d.textContent=dy;box.appendChild(d)}
+    var mine=m.f===CH_ROLE,b=document.createElement("div");b.className="chb "+(mine?"me":"th");b.textContent=m.t;box.appendChild(b);
+    var t=document.createElement("div");t.className="cht "+(mine?"me":"th");
+    t.textContent=(CH_ROLE==="s"&&!mine?"Office · ":"")+(CH_ROLE==="m"&&mine&&m.n?m.n+" · ":"")+chTime(m.at)+(i===lastMine?(os>=m.at?" · Seen":" · Sent"):"");box.appendChild(t)});
+  if(atEnd||force)box.scrollTop=box.scrollHeight;
+}
+function chVisible(){var s=$("s-chat");return !!(s&&s.classList.contains("on")&&document.visibilityState==="visible")}
+function chWire(){
+  var ta=$("chIn"),bt=$("chSend");if(!ta||ta._w)return;ta._w=1;
+  function grow(){ta.style.height="auto";ta.style.height=Math.min(ta.scrollHeight,120)+"px";bt.disabled=!ta.value.trim()}
+  ta.oninput=grow;
+  ta.onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();bt.click()}};
+  bt.onclick=function(){var uk=chCur();if(!uk)return;if(chSend(uk,ta.value)){ta.value="";grow();chThread(uk,true);chBadges()}ta.focus()};
+  grow()}
+/* new incoming messages -> notification (not for old ones, not while that chat is on screen) */
+function chNotify(){
+  var last=parseInt(CH_LS.getItem("chNoteAt")||"0",10)||0,mx=last,o=chOther(),first=!last,all=chAll(),me=CH_ROLE==="s"?CH_LS.getItem("acctKey"):null;
+  Object.keys(all).forEach(function(uk){if(me&&uk!==me)return;chMsgs(uk).forEach(function(m){if(m.f!==o||m.at<=last)return;if(m.at>mx)mx=m.at;if(first)return;
+    if(chVisible()&&chCur()===uk)return;chAlert(uk,m)})});
+  if(first)mx=Math.max(mx,sNow());if(mx!==last)try{CH_LS.setItem("chNoteAt",String(mx))}catch(x){}
+}
+function chTick(){try{chNotify();chBadges();if(chVisible())chRender()}catch(x){}}
+var _chAp=syncApply;syncApply=function(){var r=_chAp.apply(this,arguments);chTick();return r};
+var _chShow=show;show=function(n){_chShow.apply(this,arguments);if(n==="chat")chRender(true)};
+document.addEventListener("visibilitychange",function(){if(chVisible())chRender()});
+setInterval(chTick,20000);
+</script>
+<script>
+/* ---- Main: Chat tab = list of registered RJ Connect staff (accounts) -> one conversation each ---- */
+function chCur(){return chOpen}
+function chStaff(){var us=(syncR&&syncR.users)||{};return Object.keys(us).filter(function(k){return us[k]&&us[k].name&&!us[k].deleted}).map(function(k){var L=chMsgs(k);return {k:k,name:us[k].name,last:L[L.length-1]||null,un:chUnread(k)}}).sort(function(a,b){var x=a.last?a.last.at:0,y=b.last?b.last.at:0;return y-x||a.name.localeCompare(b.name)})}
+function chBadges(){var n=0;chStaff().forEach(function(s){n+=s.un});var b=$("chBadge");if(b){b.hidden=!n;b.textContent=n>9?"9+":String(n)}}
+function chInit(n){var p=String(n).trim().split(/\s+/);return (((p[0]||"")[0]||"")+((p.length>1?p[p.length-1][0]:"")||"")).toUpperCase()}
+var chLSig="";
+function chRender(force){
+  chWire();var list=$("chList"),th=$("chThread"),us=(syncR&&syncR.users)||{};
+  if(chOpen&&(!us[chOpen]||us[chOpen].deleted))chOpen=null;
+  if(chOpen){list.hidden=true;th.hidden=false;$("chBack").hidden=false;$("chTitle").textContent=us[chOpen].name;$("chSub").textContent="RJ Connect · messages are kept 30 days";
+    chThread(chOpen,force);if(chVisible()&&chUnread(chOpen))chSetSeen(chOpen);chBadges();return}
+  list.hidden=false;th.hidden=true;$("chBack").hidden=true;$("chTitle").textContent="Chat";
+  var S=chStaff();$("chSub").textContent=S.length?S.length+" staff on RJ Connect":"";
+  var sig=syncOn()+"|"+JSON.stringify(S.map(function(s){return [s.k,s.name,s.un,s.last&&[s.last.id,s.last.at]]}));if(!force&&sig===chLSig)return;chLSig=sig;chSig="";
+  list.innerHTML="";
+  function empty(t){var e=document.createElement("div");e.className="chempty";e.textContent=t;list.appendChild(e)}
+  if(!syncOn()){empty("Turn on Device Sync to chat with staff.");return}
+  if(!S.length){empty("No staff yet. Staff appear here after they sign in to RJ Connect.");return}
+  S.forEach(function(s){var b=document.createElement("button");b.type="button";b.className="chi"+(s.un?" unread":"");
+    b.innerHTML='<span class="av"></span><span class="ct"><b></b><small></small></span><span class="cr"><span class="tm"></span></span>';
+    b.querySelector(".av").textContent=chInit(s.name);b.querySelector("b").textContent=s.name;
+    b.querySelector("small").textContent=s.last?((s.last.f==="m"?"You: ":"")+s.last.t.replace(/\s+/g," ")):"Tap to send a message";
+    b.querySelector(".tm").textContent=s.last?chShort(s.last.at):"";
+    if(s.un){var x=document.createElement("span");x.className="chbadge";x.textContent=s.un>9?"9+":String(s.un);b.querySelector(".cr").appendChild(x)}
+    b.onclick=function(){chOpen=s.k;chSig="";chRender(true)};list.appendChild(b)});
+}
+$("chBack").onclick=function(){chOpen=null;chLSig="";chRender(true)};
+function chAlert(uk,m){var us=(syncR&&syncR.users)||{},nm=(us[uk]&&us[uk].name)||m.n||"Staff";
+  toast("💬 "+nm+": "+m.t.replace(/\s+/g," ").slice(0,70),true);try{if(navigator.vibrate)navigator.vibrate([100,50,100])}catch(x){}
+  try{if(window.RJAndroid&&RJAndroid.notifyShift)RJAndroid.notifyShift("💬 "+nm,m.t.slice(0,300))}catch(x){}}
+/* messages older than 30 days are removed (by the Main) */
+function chClean(){if(!syncOn()||syncState!=="live")return;var cut=sNow()-CH_KEEP,all=chAll();Object.keys(all).forEach(function(uk){var p={};Object.keys(all[uk]||{}).forEach(function(id){var m=all[uk][id];if(m&&typeof m.at==="number"&&m.at<cut)p[id]=null});if(Object.keys(p).length)syncReq("PATCH","/chat/"+uk,p).catch(function(){})})}
+setInterval(chClean,600000);setTimeout(chClean,15000);
+chBadges();
+</script>
+<style>
+.pushcard{display:flex;align-items:center;gap:10px;margin:2px 0 10px;padding:10px 12px;border-radius:16px;border:1px solid rgba(10,132,255,.35);background:rgba(10,132,255,.10);color:var(--text);font-size:14px}
+.pushcard[hidden]{display:none!important}
+#s-new>.pushcard.pushcard:not([hidden]):not(#x){display:flex!important}
+.pushcard .pi{font-size:22px}.pushcard .pt{flex:1;min-width:0}.pushcard .pt b{display:block;font-size:15px}
+.pushcard button{flex:0 0 auto;border:0;border-radius:14px;background:#0a84ff;color:#fff;font-weight:800;font-size:14px;padding:9px 12px}
+.pushcard .px{background:none;color:var(--mute);font-size:18px;padding:4px 6px}
+</style>
+<script>
+/* ===== Push notifications (iPhone / browser web app) — Firebase Cloud Messaging, sent by the Google sender v5 =====
+   Staff (RJ Connect): new chat message from the office, new / changed / cancelled schedule.
+   Main: new chat message from staff, staff confirmed a schedule.
+   Android apps keep their own phone notifications (window.RJAndroid). */
+var PUSH_CFG={apiKey:"AIzaSyDVCh1sMHIPbeNroiIGmzu9SPLorP_U_tY",authDomain:"rjshiftlogv1.firebaseapp.com",projectId:"rjshiftlogv1",
+  messagingSenderId:"700912165957",appId:"1:700912165957:web:8f4f76a5637fa0b99a6f2c"},PUSH_VAPID="BHurAqbVUirpyLNolO-v7eWDS5k8LcgLBW5VFiu1VLeTd8CFL8zVrG_SYrlg-CLtNzC3XVLK1kRZRVR8spHvfD4",
+  PUSH_URL="https://script.google.com/macros/s/AKfycbyU8wPsr-_G0wBraRObqt7UiCEdYEWm-jYYRuiWaexUGxQuxLEHBNOcrgiwONwFlqgGCw/exec",PUSH_KEY="rijamo",
+  PUSH_SDK="https://www.gstatic.com/firebasejs/10.12.2/";
+var PUSH_LS=(typeof LS!=="undefined")?LS:localStorage,PUSH_ROLE=(typeof C_TEAM!=="undefined")?"s":"m";
+function pushConfigured(){return !/@@/.test(PUSH_CFG.messagingSenderId+PUSH_CFG.appId+PUSH_VAPID)}
+function pushIOS(){return /iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)}
+function pushStandalone(){return navigator.standalone===true||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)}
+function pushSupported(){return !window.RJAndroid&&location.protocol==="https:"&&("serviceWorker" in navigator)&&("PushManager" in window)&&("Notification" in window)}
+function pushState(){ /* off | needs-home | ask | blocked | on | unsupported | android */
+  if(window.RJAndroid)return "android";if(!pushConfigured())return "unsupported";
+  if(pushIOS()&&!pushStandalone())return "needs-home";if(!pushSupported())return "unsupported";
+  if(Notification.permission==="denied")return "blocked";
+  if(Notification.permission==="granted"&&PUSH_LS.getItem("pushTok"))return "on";return "ask"}
+function pushLink(){return location.origin+location.pathname}
+function pushWho(){return PUSH_ROLE==="s"?(PUSH_LS.getItem("acctKey")||""):""}
+var pushSdkP=null;
+function pushSdk(){if(window.firebase&&firebase.messaging)return Promise.resolve();if(pushSdkP)return pushSdkP;
+  function ld(f){return new Promise(function(ok,no){var s=document.createElement("script");s.src=PUSH_SDK+f;s.onload=ok;s.onerror=function(){no("Couldn't load the notification service — check the internet.")};document.head.appendChild(s)})}
+  pushSdkP=ld("firebase-app-compat.js").then(function(){return ld("firebase-messaging-compat.js")}).catch(function(e){pushSdkP=null;throw e});return pushSdkP}
+function pushRegister(ask){
+  if(!pushSupported()||!pushConfigured()||!syncOn())return Promise.resolve(false);
+  return (ask?Notification.requestPermission():Promise.resolve(Notification.permission)).then(function(p){
+    if(p!=="granted")throw p==="denied"?"blocked":"not allowed";return pushSdk()}).then(function(){
+    return navigator.serviceWorker.register("sw.js").then(function(){return navigator.serviceWorker.ready})}).then(function(reg){
+    if(!firebase.apps.length)firebase.initializeApp(PUSH_CFG);
+    return firebase.messaging().getToken({vapidKey:PUSH_VAPID,serviceWorkerRegistration:reg})}).then(function(tok){
+    if(!tok)throw "no token";var old=PUSH_LS.getItem("pushTok");PUSH_LS.setItem("pushTok",tok);
+    var me=syncDevId(),cur=(syncR.push||{})[me]||{};
+    if(old!==tok||cur.t!==tok||cur.u!==pushWho()||cur.l!==pushLink())
+      return syncReq("PUT","/push/"+me,{t:tok,r:PUSH_ROLE,u:pushWho(),n:(lsGet("syncDevName","")||""),l:pushLink(),at:{".sv":"timestamp"}}).then(function(){return true});
+    return true})}
+function pushOn(){pushRegister(true).then(function(ok){if(ok)toast("🔔 Notifications are on",true);pushCards()},function(e){
+  toast(e==="blocked"?"Notifications are blocked — see the steps on screen.":"Notifications not turned on: "+e);pushCards()})}
+/* who gets a push */
+function pushTargets(fn){var P=(syncR&&syncR.push)||{},me=syncDevId(),seen={},out=[];
+  Object.keys(P).forEach(function(k){var x=P[k];if(!x||!x.t||k===me||seen[x.t]||!fn(x))return;seen[x.t]=1;out.push({t:x.t,l:x.l||""})});return out}
+function pushUserOk(u){var us=(syncR&&syncR.users)||{};return !!(u&&us[u]&&!us[u].deleted)}
+function pushToStaff(uk,title,body,tag){return pushSend(pushTargets(function(x){return x.r==="s"&&x.u===uk&&pushUserOk(uk)}),title,body,tag)}
+function pushToMains(title,body,tag){return pushSend(pushTargets(function(x){return x.r==="m"}),title,body,tag)}
+function pushSend(to,title,body,tag){
+  if(!to.length||!syncOn())return Promise.resolve(0);
+  return fetch(PUSH_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},redirect:"follow",
+    body:JSON.stringify({key:PUSH_KEY,action:"push",to:to,title:title,body:body,tag:tag||""})}).then(function(r){return r.json()}).then(function(j){
+    (j&&j.bad||[]).forEach(function(t){var P=(syncR&&syncR.push)||{};Object.keys(P).forEach(function(k){if(P[k]&&P[k].t===t){delete P[k];syncReq("DELETE","/push/"+k).catch(function(){})}})});
+    return j&&j.sent||0}).catch(function(){return 0})}
+function pushUkOf(name){var us=(syncR&&syncR.users)||{},l=String(name||"").trim().toLowerCase(),f=null;Object.keys(us).forEach(function(k){var u=us[k];if(u&&!u.deleted&&String(u.name||"").trim().toLowerCase()===l)f=k});return f}
+function pushShiftLbl(e){try{return schLbl(e)}catch(x){return e.date+" · "+e.from+" – "+e.to}}
+/* the "Turn on notifications" card (top of the first screen and the Chat screen) */
+function pushCards(){var st=pushState(),dis=PUSH_LS.getItem("pushHide")==="1";
+  document.querySelectorAll(".pushcard").forEach(function(c){
+    var show=!dis&&syncOn()&&(st==="ask"||st==="needs-home"||st==="blocked");c.hidden=!show;if(!show)return;
+    var t=c.querySelector(".pt"),b=c.querySelector(".pb");
+    if(st==="ask"){t.innerHTML="<b>Turn on notifications</b>";t.appendChild(document.createTextNode(PUSH_ROLE==="s"?"Get an alert for new shifts and office messages, even when the app is closed.":"Get an alert for staff messages and confirmed shifts, even when the app is closed."));b.hidden=false;b.textContent="Turn on"}
+    else if(st==="needs-home"){t.innerHTML="<b>Notifications need the Home Screen app</b>Safari: Share ⬆︎ → Add to Home Screen, then open RJ from the new icon.";b.hidden=true}
+    else{t.innerHTML="<b>Notifications are blocked</b>iPhone Settings → Notifications → RJ → turn on Allow Notifications, then reopen the app.";b.hidden=true}})}
+function pushSlot(el){var c=document.createElement("div");c.className="pushcard";c.hidden=true;
+  c.innerHTML='<span class="pi">🔔</span><span class="pt"></span><button type="button" class="pb">Turn on</button><button type="button" class="px" aria-label="Hide">✕</button>';
+  c.querySelector(".pb").onclick=pushOn;c.querySelector(".px").onclick=function(){try{PUSH_LS.setItem("pushHide","1")}catch(x){}pushCards()};
+  var h=el.querySelector(":scope > .hd");el.insertBefore(c,h?h.nextSibling:el.firstChild)}
+/* ---- hooks: what sends a push ---- */
+var _pushChSend=chSend;chSend=function(uk,text){var ok=_pushChSend.apply(this,arguments);
+  if(ok){var t=String(text).trim().slice(0,300);
+    if(PUSH_ROLE==="m")pushToStaff(uk,"💬 Message from the office",t,"chat");
+    else pushToMains("💬 "+(myName()||"Staff"),t,"chat")}
+  return ok};
+var _pushReq=syncReq;syncReq=function(method,path,body){
+  var p=_pushReq.apply(this,arguments),m=/^\/sched\/([^\/]+)$/.exec(path||"");
+  if(m&&p&&p.then){var id=m[1],before=pushSnap[id];
+    p.then(function(){try{
+      if(PUSH_ROLE==="s"&&method==="PATCH"&&body&&body.status==="confirmed"){var e=(syncR.sched&&syncR.sched[id])||before;
+        if(e)pushToMains("✅ "+(myName()||e.name)+" confirmed",pushShiftLbl(e),"conf")}
+      if(PUSH_ROLE==="m"){var uk;
+        if(method==="PUT"&&body&&body.status==="pending"&&(uk=pushUkOf(body.name)))
+          pushToStaff(uk,before?"✏️ Shift changed":"🗓️ New shift",pushShiftLbl(body),"sched");
+        else if(method==="PATCH"&&body&&body.date&&before&&(uk=pushUkOf(before.name)))
+          pushToStaff(uk,"✏️ Shift changed",pushShiftLbl(Object.assign({},before,body)),"sched");
+        else if(method==="DELETE"&&before&&before.status!=="confirmed"&&(uk=pushUkOf(before.name)))
+          pushToStaff(uk,"❌ Shift cancelled",pushShiftLbl(before),"sched")}
+    }catch(x){}},function(){})}
+  return p};
+var pushSnap={};
+function pushSnapNow(){var o=(syncR&&syncR.sched)||{},n={};Object.keys(o).forEach(function(k){if(o[k])n[k]=JSON.parse(JSON.stringify(o[k]))});pushSnap=n}
+var _pushAp=syncApply;syncApply=function(){var r=_pushAp.apply(this,arguments);try{pushSnapNow();pushCards()}catch(x){}return r};
+/* start */
+try{pushSlot($("s-new"));pushSlot($("s-chat"))}catch(x){}
+var pushChkAt=0;
+function pushCheck(){if(Date.now()-pushChkAt<60000||syncState!=="live")return;pushChkAt=Date.now();
+  if(pushSupported()&&pushConfigured()&&Notification.permission==="granted"&&(!pushIOS()||pushStandalone()))pushRegister(false).catch(function(){})}
+var _pushAp2=syncApply;syncApply=function(){var r=_pushAp2.apply(this,arguments);try{pushCheck()}catch(x){}return r};
+pushCards();
 </script>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}</script>
 </body>
