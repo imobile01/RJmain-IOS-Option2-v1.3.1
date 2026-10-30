@@ -1,5 +1,5 @@
 /* RJ ShiftLog web app: works offline after the first visit; always uses the newest version when online */
-const CACHE="rj2-shiftlog-v19";
+const CACHE="rj2-shiftlog-v22";
 const FILES=["./","index.html","manifest.webmanifest","apple-touch-icon.png","icon-192.png","icon-512.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x.indexOf("rj2-shiftlog-")===0&&x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});

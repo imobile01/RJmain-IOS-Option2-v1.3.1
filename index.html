@@ -1,6 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* ===== Calgary time everywhere (America/Edmonton, MST/MDT) — whatever time zone the phone is set to.
+   Every date/time the app reads or builds (today, cut-offs, Confirm time, 23:59 clearing, Excel dates, labels) follows Calgary. ===== */
+(function(){
+  var TZ="America/Edmonton",N=Date;
+  try{if(!(window.Intl&&Intl.DateTimeFormat))return;new Intl.DateTimeFormat("en-US",{timeZone:TZ}).format(0)}catch(e){return}
+  var F=new Intl.DateTimeFormat("en-US",{timeZone:TZ,hourCycle:"h23",year:"numeric",month:"numeric",day:"numeric",hour:"numeric",minute:"numeric",second:"numeric"}),C={};
+  function off(t){var k=Math.floor(t/900000);if(C[k]!==undefined)return C[k];var p={};
+    F.formatToParts(new N(t)).forEach(function(x){p[x.type]=x.value});var h=+p.hour;if(h===24)h=0;
+    var w=N.UTC(+p.year,+p.month-1,+p.day,h,+p.minute,+p.second),s=t-((t%1000)+1000)%1000;return (C[k]=Math.round((w-s)/60000))}
+  function wall(t){return new N(t+off(t)*60000)}
+  function fromWall(y,mo,d,h,mi,s,ms){var w=N.UTC(y,mo,d,h,mi,s,ms);if(w!==w)return NaN;var t=w-off(w)*60000;return w-off(t)*60000}
+  var P=N.prototype,setT=P.setTime,getT=P.getTime;
+  [["FullYear","getUTCFullYear"],["Month","getUTCMonth"],["Date","getUTCDate"],["Day","getUTCDay"],["Hours","getUTCHours"],["Minutes","getUTCMinutes"],["Seconds","getUTCSeconds"],["Milliseconds","getUTCMilliseconds"]].forEach(function(g){
+    var u=P[g[1]];P["get"+g[0]]=function(){var t=getT.call(this);return t!==t?NaN:u.call(wall(t))}});
+  P.getTimezoneOffset=function(){var t=getT.call(this);return t!==t?NaN:-off(t)};
+  function parts(d){var w=wall(getT.call(d));return [w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate(),w.getUTCHours(),w.getUTCMinutes(),w.getUTCSeconds(),w.getUTCMilliseconds()]}
+  function S(i,n){return function(){var t=getT.call(this);if(t!==t)return NaN;var a=parts(this);for(var j=0;j<n&&j<arguments.length;j++)a[i+j]=+arguments[j];return setT.call(this,fromWall(a[0],a[1],a[2],a[3],a[4],a[5],a[6]))}}
+  P.setFullYear=S(0,3);P.setMonth=S(1,2);P.setDate=S(2,1);P.setHours=S(3,4);P.setMinutes=S(4,3);P.setSeconds=S(5,2);P.setMilliseconds=S(6,1);
+  ["toLocaleString","toLocaleDateString","toLocaleTimeString"].forEach(function(k){var f=P[k];P[k]=function(loc,o){var q={};if(o)for(var x in o)q[x]=o[x];if(!q.timeZone)q.timeZone=TZ;return f.call(this,loc,q)}});
+  var DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function p2(n){return (n<10?"0":"")+n}
+  P.toDateString=function(){var t=getT.call(this);if(t!==t)return "Invalid Date";var w=wall(t);return DN[w.getUTCDay()]+" "+MN[w.getUTCMonth()]+" "+p2(w.getUTCDate())+" "+w.getUTCFullYear()};
+  P.toTimeString=function(){var t=getT.call(this);if(t!==t)return "Invalid Date";var w=wall(t),o=off(t),a=Math.abs(o);
+    return p2(w.getUTCHours())+":"+p2(w.getUTCMinutes())+":"+p2(w.getUTCSeconds())+" GMT"+(o<0?"-":"+")+p2(Math.floor(a/60))+p2(a%60)+" (Calgary Time)"};
+  P.toString=function(){var t=getT.call(this);return t!==t?"Invalid Date":this.toDateString()+" "+this.toTimeString()};
+  var LOC=/^(\d{4})-(\d\d)-(\d\d)[T ](\d\d):(\d\d)(?::(\d\d)(?:\.(\d{1,3})\d*)?)?$/;
+  function parseLocal(s){var m=LOC.exec(s);return m?fromWall(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0),+((m[7]||"0")+"00").slice(0,3)):null}
+  function D(a,b,c,d,e,f,g){
+    if(!(this instanceof D))return new D().toString();
+    var n=arguments.length,r;
+    if(n===0)r=new N();
+    else if(n===1){var pl=typeof a==="string"?parseLocal(a.trim()):null;r=pl!==null?new N(pl):new N(a instanceof N?getT.call(a):a)}
+    else r=new N(fromWall(+a,+b,n>2?+c:1,n>3?+d:0,n>4?+e:0,n>5?+f:0,n>6?+g:0));
+    return r}
+  D.prototype=P;D.now=N.now;D.UTC=N.UTC;D.parse=function(s){var pl=typeof s==="string"?parseLocal(s.trim()):null;return pl!==null?pl:N.parse(s)};
+  try{Object.defineProperty(P,"constructor",{value:D,writable:true,configurable:true})}catch(x){}
+  window.Date=D;window.RJ_TZ=TZ;
+})();
+</script>
 <meta charset="utf-8">
 <title>RJ ShiftLog</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -1507,7 +1547,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.18 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.21 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2813,13 +2853,16 @@ var _schAp=syncApply;syncApply=function(){var r=_schAp.apply(this,arguments);try
 .chbar textarea:focus{border-color:#0a84ff}
 .chbar button{flex:0 0 auto;border:0;border-radius:20px;background:#0a84ff;color:#fff;font-weight:800;font-size:16px;padding:11px 16px}
 .chbar button:disabled{opacity:.45}
+.chname{border:1px solid rgba(10,132,255,.35);background:rgba(10,132,255,.10);border-radius:16px;padding:10px 12px;margin:0 0 10px;font-size:14px}
+.chname b{display:block;font-size:15px}.chname span{color:var(--mute);font-size:13px}
+.chname input{flex:1;font:inherit;font-size:16px;padding:10px 14px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--text);min-width:0}
 </style>
 <script>
 /* ===== Option 2 chat: Main (office) <-> each RJ Connect staff account. Firebase: /chat/{account}/{msg}, /chatSeen/{account} ===== */
 var CH_LS=(typeof LS!=="undefined")?LS:localStorage,CH_ROLE=(typeof C_TEAM!=="undefined")?"s":"m",CH_KEEP=30*864e5,chOpen=null;
 function chAll(){return (syncR&&syncR.chat)||{}}
 function chSeenAll(){return (syncR&&syncR.chatSeen)||{}}
-function chMsgs(uk){var o=chAll()[uk]||{};return Object.keys(o).map(function(k){var m=o[k];if(!m||typeof m.t!=="string")return null;return {id:k,f:m.f,t:m.t,n:m.n||"",at:typeof m.at==="number"?m.at:sNow()}}).filter(Boolean).sort(function(a,b){return a.at-b.at||(a.id<b.id?-1:1)})}
+function chMsgs(uk){var o=chAll()[uk]||{};return Object.keys(o).map(function(k){var m=o[k];if(!m||typeof m.t!=="string")return null;return {id:k,f:m.f,t:m.t,n:m.n||"",d:m.d||"",at:typeof m.at==="number"?m.at:sNow()}}).filter(Boolean).sort(function(a,b){return a.at-b.at||(a.id<b.id?-1:1)})}
 function chSeen(uk,who){var s=chSeenAll()[uk]||{};return typeof s[who]==="number"?s[who]:0}
 function chOther(){return CH_ROLE==="m"?"s":"m"}
 function chUnread(uk){var seen=chSeen(uk,CH_ROLE),o=chOther();return chMsgs(uk).filter(function(m){return m.f===o&&m.at>seen}).length}
@@ -2828,11 +2871,12 @@ function chSend(uk,text){
   text=String(text||"").replace(/\s+$/,"").replace(/^\s+/,"").slice(0,1000);if(!text||!uk)return false;
   if(!syncOn()){toast("Not connected — turn on sync first.");return false}
   var id="c"+sNow().toString(36)+Math.random().toString(36).slice(2,6),me=chMe();
-  syncR.chat=syncR.chat||{};syncR.chat[uk]=syncR.chat[uk]||{};syncR.chat[uk][id]={f:CH_ROLE,t:text,n:me,at:sNow()};
+  syncR.chat=syncR.chat||{};syncR.chat[uk]=syncR.chat[uk]||{};syncR.chat[uk][id]={f:CH_ROLE,t:text,n:me,d:syncDevId(),at:sNow()};
   chSetSeen(uk);
-  syncReq("PUT","/chat/"+uk+"/"+id,{f:CH_ROLE,t:text,n:me,at:{".sv":"timestamp"}}).catch(function(){try{delete syncR.chat[uk][id]}catch(x){}toast("Message not sent — check the internet and try again.");chRender()});
+  syncReq("PUT","/chat/"+uk+"/"+id,{f:CH_ROLE,t:text,n:me,d:syncDevId(),at:{".sv":"timestamp"}}).catch(function(){try{delete syncR.chat[uk][id]}catch(x){}toast("Message not sent — check the internet and try again.");chRender()});
   return true}
 function chSetSeen(uk){syncR.chatSeen=syncR.chatSeen||{};syncR.chatSeen[uk]=Object.assign({},syncR.chatSeen[uk]||{});syncR.chatSeen[uk][CH_ROLE]=sNow();var o={};o[CH_ROLE]={".sv":"timestamp"};syncReq("PATCH","/chatSeen/"+uk,o).catch(function(){})}
+function chFrom(m){var dv=(syncR&&syncR.devices)||{},x=m.d&&dv[m.d],nm=x&&x.name&&x.name!=="Device"?x.name:"";return nm||(m.n&&m.n!=="Device"?m.n:"")||"Office"}
 function chDay(ms){var d=new Date(ms),t=new Date(),y=new Date(t.getFullYear(),t.getMonth(),t.getDate()-1);
   if(d.toDateString()===t.toDateString())return "Today";if(d.toDateString()===y.toDateString())return "Yesterday";
   return d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}
@@ -2849,7 +2893,7 @@ function chThread(uk,force){
     var dy=chDay(m.at);if(dy!==lastDay){lastDay=dy;var d=document.createElement("div");d.className="chday";d.textContent=dy;box.appendChild(d)}
     var mine=m.f===CH_ROLE,b=document.createElement("div");b.className="chb "+(mine?"me":"th");b.textContent=m.t;box.appendChild(b);
     var t=document.createElement("div");t.className="cht "+(mine?"me":"th");
-    t.textContent=(CH_ROLE==="s"&&!mine?"Office · ":"")+(CH_ROLE==="m"&&mine&&m.n?m.n+" · ":"")+chTime(m.at)+(i===lastMine?(os>=m.at?" · Seen":" · Sent"):"");box.appendChild(t)});
+    t.textContent=(CH_ROLE==="s"&&!mine?chFrom(m)+" · ":"")+(CH_ROLE==="m"&&mine&&m.n?m.n+" · ":"")+chTime(m.at)+(i===lastMine?(os>=m.at?" · Seen":" · Sent"):"");box.appendChild(t)});
   if(atEnd||force)box.scrollTop=box.scrollHeight;
 }
 function chVisible(){var s=$("s-chat");return !!(s&&s.classList.contains("on")&&document.visibilityState==="visible")}
@@ -2889,6 +2933,10 @@ function chRender(force){
   var S=chStaff();$("chSub").textContent=S.length?S.length+" staff on RJ Connect":"";
   var sig=syncOn()+"|"+JSON.stringify(S.map(function(s){return [s.k,s.name,s.un,s.last&&[s.last.id,s.last.at]]}));if(!force&&sig===chLSig)return;chLSig=sig;chSig="";
   list.innerHTML="";
+  if(!lsGet("syncDevName","")){var nc=document.createElement("div");nc.className="chname";
+    nc.innerHTML='<b>Your name in chat</b><span>Staff see this name on your messages and notifications.</span><div class="chbar"><input id="chNm" maxlength="40" placeholder="e.g. Paul or RJ Office"><button type="button" id="chNmGo">Save</button></div>';
+    list.appendChild(nc);$("chNmGo").onclick=function(){var v=$("chNm").value.trim().replace(/\s+/g," ");if(v.length<2){toast("Type a name (at least 2 letters).");return}
+      try{localStorage.setItem("syncDevName",v)}catch(x){}if(syncOn())syncReq("PATCH","/devices/"+syncDevId(),{name:v}).catch(function(){});toast("Saved — staff will see “"+v+"”",true);chLSig="";chRender(true)}}
   function empty(t){var e=document.createElement("div");e.className="chempty";e.textContent=t;list.appendChild(e)}
   if(!syncOn()){empty("Turn on Device Sync to chat with staff.");return}
   if(!S.length){empty("No staff yet. Staff appear here after they sign in to RJ Connect.");return}
@@ -2985,7 +3033,7 @@ function pushSlot(el){var c=document.createElement("div");c.className="pushcard"
 /* ---- hooks: what sends a push ---- */
 var _pushChSend=chSend;chSend=function(uk,text){var ok=_pushChSend.apply(this,arguments);
   if(ok){var t=String(text).trim().slice(0,300);
-    if(PUSH_ROLE==="m")pushToStaff(uk,"Office",t,"chat");
+    if(PUSH_ROLE==="m")pushToStaff(uk,lsGet("syncDevName","")||"Office",t,"chat");
     else pushToMains(myName()||"Staff",t,"chat")}
   return ok};
 var _pushReq=syncReq;syncReq=function(method,path,body){
@@ -3067,6 +3115,32 @@ var _bdgAp=syncApply;syncApply=function(){var r=_bdgAp.apply(this,arguments);try
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"){bdgLast=-1;setTimeout(bdgSet,800)}});
 setInterval(function(){try{bdgSet()}catch(x){}},3000);
 setTimeout(bdgSet,1500);
+</script>
+<style>
+#wpBtn{display:none!important}
+.cgclock{flex:none;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;line-height:1.05;padding:5px 10px;border-radius:14px;
+  background:var(--card);border:1px solid var(--line);box-shadow:0 2px 10px rgba(0,0,0,.08);cursor:default;user-select:none;-webkit-user-select:none}
+.cgclock .cgt{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;font-size:19px;white-space:nowrap;font-weight:800;letter-spacing:.02em;color:var(--acc)}
+.cgclock .cgt i{font-style:normal;animation:cgb 1s steps(1) infinite}
+.cgclock .cgt small{font-size:11px;font-weight:800;margin-left:3px;color:var(--text)}
+.cgclock .cgd{font-size:10px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:var(--mute);margin-top:2px;white-space:nowrap}
+@keyframes cgb{50%{opacity:.25}}
+@media (max-width:380px){.cgclock{padding:4px 8px}.cgclock .cgt{font-size:17px}}
+</style>
+<script>
+/* Calgary digital clock in the header (where the Wallpaper button was) + Wallpaper moved into Entry, below Device Sync */
+(function(){
+  var b=$("wpBtn"),c=document.createElement("div");c.className="cgclock";c.id="cgClock";c.title="Calgary time";c.setAttribute("aria-label","Calgary time");
+  c.innerHTML='<span class="cgt"></span><span class="cgd"></span>';b.parentNode.insertBefore(c,b);
+  function tick(){var d=new Date(),h=d.getHours(),m=d.getMinutes(),ap=h<12?"AM":"PM",h12=h%12||12;
+    c.querySelector(".cgt").innerHTML=h12+'<i>:</i>'+(m<10?"0":"")+m+'<small>'+ap+'</small>';
+    c.querySelector(".cgd").textContent="Calgary";c.title="Calgary time · "+d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
+  tick();setInterval(tick,1000);
+  var _rem=renderEntMenu;renderEntMenu=function(){var r=_rem.apply(this,arguments);try{
+    if(!entSec){var M=$("entMenu"),w=document.createElement("button");w.type="button";w.className="fold emi";
+      w.innerHTML='<span class="eic">🖼️</span><span class="fn"><b>Wallpaper</b><small>Change the background picture</small></span><span class="chev">›</span>';
+      w.onclick=function(){renderWp();$("wsheet").classList.add("open")};M.appendChild(w)}}catch(x){}return r};
+})();
 </script>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}</script>
 </body>
