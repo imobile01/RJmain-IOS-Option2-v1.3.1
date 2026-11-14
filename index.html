@@ -1595,7 +1595,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.40 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.42 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2354,8 +2354,9 @@ function applyWp(){
   var w=null;
   if(curWp&&curWp.type==="photo"&&photo)w={bg:'linear-gradient(rgba(0,0,0,.1),rgba(0,0,0,.1)),url("'+photo.data+'") center/cover no-repeat',tone:photo.tone};
   else if(curWp&&curWp.type==="preset")w=wpById(curWp.id);
-  if(!w){b.style.background="";b.style.backgroundAttachment="";r.removeAttribute("data-wp");return}
-  b.style.background=w.bg;b.style.backgroundAttachment="fixed";r.setAttribute("data-wp",w.tone);
+  var wl=document.getElementById("rjWall");b.style.background="";b.style.backgroundAttachment="";
+  if(!w){if(wl)wl.style.background="";r.removeAttribute("data-wp");return}
+  if(wl)wl.style.background=w.bg;else{b.style.background=w.bg;b.style.backgroundAttachment="fixed"}r.setAttribute("data-wp",w.tone);
 }
 function pickWp(c){
   curWp=c;
@@ -2861,7 +2862,7 @@ function o2Flush(cb){if(!syncOn()){cb();return}clearTimeout(syncT);var n=0;(func
 function renderSchedFolder(L){
   /* 12.25: red = waiting for the staff to accept · green (moved down) = accepted, waiting to be logged ·
      logged shifts leave this folder and are in Records under the staff member's name */
-  $("seg").hidden=true;$("backBtn").hidden=false;$("backBtn").textContent="‹ Names";$("recTitle").textContent="Schedules";$("acts").innerHTML="";try{$("hint").textContent="Red = waiting for the staff to accept · Green = accepted (Log opens at the start time) · Logged shifts move to Records under the staff member's name"}catch(x){}
+  $("seg").hidden=true;$("backBtn").hidden=false;$("backBtn").textContent="‹ Records";$("recTitle").textContent="Schedules";$("acts").innerHTML="";try{$("hint").textContent="Red = waiting for the staff to accept · Green = accepted (Log opens at the start time) · Logged shifts move to Records under the staff member's name"}catch(x){}
   L.innerHTML="";var all=schList().filter(function(x){return x.status!=="confirmed"}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:parseT(a.from)-parseT(b.from)});
   var wait=all.filter(function(x){return !x.accAt}),acc=all.filter(function(x){return !!x.accAt});
   if(!all.length){L.innerHTML='<div class="empty">No shifts waiting. Logged shifts are in Records under each staff member\'s name. To add one, go to the Schedule screen, choose a staff member who uses the staff app and tap Save.</div>';return}
@@ -3376,7 +3377,7 @@ var _rmRS=renderSync;renderSync=function(){var r=_rmRS.apply(this,arguments);try
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}
 /* ===== 12.31 / 2.21: 🔄 Refresh app — gets the newest version from the same link (GitHub Pages) and restarts.
    Your data (records, schedules, chat, sign-in) stays; only the app's stored copy is replaced. ===== */
-var RJ_VER="12.40";
+var RJ_VER="12.42";
 function rjRefresh(){
   if(window.RJAndroid){try{toast("Android: install the new app file (APK) to update this app.")}catch(x){}return}
   try{toast("Getting the newest version…",true)}catch(x){}
