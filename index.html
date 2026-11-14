@@ -46,9 +46,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0a84ff">
+<meta name="theme-color" content="#e9eefb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-title" content="RJ ShiftLog">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- keep "default" (opaque): iOS 26 leaves a covered strip at the bottom with black-translucent -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -398,8 +400,7 @@ button,select,input,#pad button{touch-action:manipulation}
 #lock,#lock *{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<script>/* full screen on iPhone Home Screen apps: fill the strip iOS leaves below the page */
-(function(){function fit(){try{var sa=navigator.standalone===true||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches);var g=0;if(sa){var land=innerWidth>innerHeight,sh=land?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height);g=sh-innerHeight;if(g<0||g>140)g=0}document.documentElement.style.setProperty("--gapfix",g+"px")}catch(e){}}fit();addEventListener("resize",fit);addEventListener("orientationchange",function(){setTimeout(fit,300)});addEventListener("pageshow",fit)})();</script>
+
 </head>
 <body>
 <div id="rjWall"></div><div id="app">
@@ -1585,7 +1586,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.35 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.37 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2551,7 +2552,7 @@ function syncStart(){
       if(myGen!==syncGen)return;
       var es=new EventSource(syncBase()+".json?auth="+encodeURIComponent(t));syncES=es;
       function ev(merge){return function(e){var m;try{m=JSON.parse(e.data)}catch(x){return}if(!m)return;
-        if(m.path==="/"&&!merge){syncR={recs:{},lists:{},hist:{},devices:{},cfg:null};setAt(syncR,"/",m.data||{},true);["recs","lists","hist","devices"].forEach(function(k){if(!syncR[k])syncR[k]={}})}
+        if(m.path==="/"&&!merge){syncGotRoot=true;syncR={recs:{},lists:{},hist:{},devices:{},cfg:null};setAt(syncR,"/",m.data||{},true);["recs","lists","hist","devices"].forEach(function(k){if(!syncR[k])syncR[k]={}})}
         else setAt(syncR,m.path,m.data,merge);
         syncLastEv=Date.now();syncState="live";clearTimeout(syncApplyT);syncApplyT=setTimeout(function(){syncApply();syncDirty()},250)}}
       es.addEventListener("keep-alive",function(){syncLastEv=Date.now()});es.addEventListener("put",ev(false));es.addEventListener("patch",ev(true));
@@ -2572,7 +2573,7 @@ setInterval(function(){
 },60000);
 window.addEventListener("online",function(){if(syncOn())syncStart()});
 /* v9.3: full re-check (in case the live connection silently dropped) + reconnect when the app comes back on screen */
-function syncPull(){if(!syncOn())return Promise.resolve();return syncReq("GET","").then(function(d){d=d||{};syncR={recs:d.recs||{},lists:d.lists||{},hist:d.hist||{},devices:d.devices||{},cfg:d.cfg||null,users:d.users||{},sched:d.sched||{},chat:d.chat||{},chatSeen:d.chatSeen||{},push:d.push||{}};syncApply();syncDirty()}).catch(function(e){syncLastErr=String(e);syncUi()})}
+function syncPull(){if(!syncOn())return Promise.resolve();return syncReq("GET","").then(function(d){d=d||{};syncGotRoot=true;syncR={recs:d.recs||{},lists:d.lists||{},hist:d.hist||{},devices:d.devices||{},cfg:d.cfg||null,users:d.users||{},sched:d.sched||{},chat:d.chat||{},chatSeen:d.chatSeen||{},push:d.push||{}};syncApply();syncDirty()}).catch(function(e){syncLastErr=String(e);syncUi()})}
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"&&syncOn())syncStart()});
 window.addEventListener("pageshow",function(e){if(e.persisted&&syncOn())syncStart()});
 /* one-time fix for list timestamps saved with a wrong device clock */
@@ -2923,7 +2924,14 @@ var _schAp=syncApply;syncApply=function(){var r=_schAp.apply(this,arguments);try
 <script>
 /* ===== Option 2 chat: Main (office) <-> each RJ Connect staff account. Firebase: /chat/{account}/{msg}, /chatSeen/{account} ===== */
 var CH_LS=(typeof LS!=="undefined")?LS:localStorage,CH_ROLE=(typeof C_TEAM!=="undefined")?"s":"m",CH_KEEP=30*864e5,chOpen=null;
-function chAll(){return (syncR&&syncR.chat)||{}}
+var syncGotRoot=window.syncGotRoot||false,chCacheT=0,CH_CK=["chat","chatSeen","users","sched"];
+function chCacheKey(){var p="";try{p=CH_LS.getItem("syncPath")||CH_LS.getItem("syncTeam")||""}catch(x){}return "chCache|"+p}
+function chCacheSave(){if(!syncGotRoot||!syncR)return;var n=Date.now();if(n-chCacheT<2000)return;chCacheT=n;
+  try{var o={at:n};CH_CK.forEach(function(k){if(syncR[k])o[k]=syncR[k]});var js=JSON.stringify(o);if(js.length>1500000)js=js.replace(/,"th":"[^"]*"/g,"");CH_LS.setItem(chCacheKey(),js)}catch(x){}}
+(function(){try{if(syncGotRoot)return;var o=JSON.parse(CH_LS.getItem(chCacheKey())||"null");if(!o)return;CH_CK.forEach(function(k){if(o[k]&&!syncR[k])syncR[k]=o[k]})}catch(x){}})();
+setInterval(chCacheSave,5000);addEventListener("pagehide",function(){chCacheT=0;chCacheSave()});
+document.addEventListener("visibilitychange",function(){if(document.hidden){chCacheT=0;chCacheSave()}});
+function chAll(){chCacheSave();return (syncR&&syncR.chat)||{}}
 function chSeenAll(){return (syncR&&syncR.chatSeen)||{}}
 function chMsgs(uk){var o=chAll()[uk]||{};return Object.keys(o).map(function(k){var m=o[k];if(!m||typeof m.t!=="string")return null;return {id:k,f:m.f,t:m.t,n:m.n||"",d:m.d||"",card:m.card||null,ph:m.ph||"",th:m.th||"",w:m.w||0,h:m.h||0,sending:m.sending||0,at:typeof m.at==="number"?m.at:sNow()}}).filter(Boolean).sort(function(a,b){return a.at-b.at||(a.id<b.id?-1:1)})}
 function chSeen(uk,who){var s=chSeenAll()[uk]||{};return typeof s[who]==="number"?s[who]:0}
@@ -3357,18 +3365,20 @@ var _rmRS=renderSync;renderSync=function(){var r=_rmRS.apply(this,arguments);try
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}
 /* ===== 12.31 / 2.21: 🔄 Refresh app — gets the newest version from the same link (GitHub Pages) and restarts.
    Your data (records, schedules, chat, sign-in) stays; only the app's stored copy is replaced. ===== */
-var RJ_VER="12.35";
+var RJ_VER="12.37";
 function rjRefresh(){
   if(window.RJAndroid){try{toast("Android: install the new app file (APK) to update this app.")}catch(x){}return}
   try{toast("Getting the newest version…",true)}catch(x){}
   var done=false;function go(){if(done)return;done=true;var p=[];
     try{if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(x){}
     try{if(window.caches&&caches.keys)p.push(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!=="rj-photos"}).map(function(k){return caches.delete(k)}))}))}catch(x){}
-    Promise.all(p).catch(function(){}).then(function(){try{sessionStorage.setItem("rjUpd",RJ_VER)}catch(x){}location.replace(location.pathname+"?u="+Date.now()+location.hash)})}
+    Promise.all(p).catch(function(){}).then(function(){try{sessionStorage.setItem("rjUpd",RJ_VER)}catch(x){}try{chCacheT=0;chCacheSave()}catch(x){}try{var tb=document.querySelector(".tabs button.on"),ci=document.getElementById("chIn");sessionStorage.setItem("rjUpdUI",JSON.stringify({s:tb?tb.dataset.s:"",o:(typeof chOpen==="string")?chOpen:null,d:ci?ci.value:""}))}catch(x){}location.replace(location.pathname+"?u="+Date.now()+location.hash)})}
   try{(typeof syncPush==="function"&&typeof syncOn==="function"&&syncOn()?syncPush():Promise.resolve()).then(go,go)}catch(x){go()}
   setTimeout(go,4000)}
 (function(){var prev=null;try{prev=sessionStorage.getItem("rjUpd");sessionStorage.removeItem("rjUpd")}catch(x){}
   try{if(/[?&]u=\d+/.test(location.search))history.replaceState(history.state,"",location.pathname+location.hash)}catch(x){}
+  var ui=null;try{ui=JSON.parse(sessionStorage.getItem("rjUpdUI")||"null");sessionStorage.removeItem("rjUpdUI")}catch(x){}
+  if(prev&&ui)setTimeout(function(){try{if(ui.o&&typeof chOpen!=="undefined")chOpen=ui.o;if(ui.s)show(ui.s);var ci=document.getElementById("chIn");if(ci&&ui.d){ci.value=ui.d;try{ci.dispatchEvent(new Event("input"))}catch(x){}}}catch(x){}},400);
   if(prev)setTimeout(function(){try{toast(prev!==RJ_VER?"✓ Updated to version "+RJ_VER:"✓ Refreshed — version "+RJ_VER+" is the newest",true)}catch(x){}},1500)})();
 </script>
 </body>
