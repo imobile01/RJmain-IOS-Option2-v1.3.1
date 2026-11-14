@@ -491,7 +491,7 @@ button,select,input,#pad button{touch-action:manipulation}
     <div class="sub" id="chSub"></div>
     <div id="chList" class="chlist"></div>
     <div id="chThread" class="chthread" hidden><div id="chMsgs" class="chmsgs"></div>
-      <div class="chbar"><button id="chCam" class="chpb" type="button" aria-label="Take a photo">📷</button><button id="chGal" class="chpb" type="button" aria-label="Choose a photo">🖼️</button><input type="file" id="chFileCam" accept="image/*" capture="environment" hidden><input type="file" id="chFileGal" accept="image/*" hidden><textarea id="chIn" rows="1" maxlength="1000" placeholder="Message…" enterkeyhint="send"></textarea><button id="chSend" type="button">Send</button></div></div>
+      <div class="chbar"><button id="chGal" class="chpb" type="button" aria-label="Send a photo">🖼️</button><input type="file" id="chFileGal" accept="image/*" hidden><textarea id="chIn" rows="1" maxlength="1000" placeholder="Message…" enterkeyhint="send"></textarea><button id="chSend" type="button">Send</button></div></div>
   </section>
 
   <nav class="tabs" id="tabs">
@@ -631,7 +631,11 @@ function acts(){
   }else{
     if(mode==="del"){
       var c=hb("Delete ("+n+")","red",function(){
-        ask("Delete "+n+" record"+(n===1?"":"s")+"?",function(){saved=saved.filter(function(r){return !sel[r.id]});persist();setMode("")});
+        ask("Delete "+n+" record"+(n===1?"":"s")+"?",function(){saved=saved.filter(function(r){return !sel[r.id]});persist();
+          /* 12.29 fix: a deleted logged shift also leaves the staff member's My Schedule */
+          try{var gone=Object.keys(sel).filter(function(id){return sel[id]&&syncR.sched&&syncR.sched[id]});
+            gone.forEach(function(id){schMoved[id]=1;delete syncR.sched[id]});if(gone.length){schCacheSave();o2Flush(function(){gone.forEach(function(id){syncReq("DELETE","/sched/"+id).catch(function(){})})})}}catch(x){}
+          setMode("")});
       });
       c.disabled=!n;A.appendChild(c);
     }
@@ -1547,7 +1551,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.28 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.30 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2756,6 +2760,11 @@ $("qeSave").onclick=function(){
   if(e._s){var r2=Object.assign({},rec,{status:"pending",at:{".sv":"timestamp"}});syncR.sched=syncR.sched||{};syncR.sched[e.id]=Object.assign({},rec,{status:"pending",at:Date.now()});schCacheSave();
     syncReq("PUT","/sched/"+e.id,r2).catch(function(x){toast("Couldn't update: "+x)});chShiftCard(rec,"chg",oldS);$("qe").classList.remove("open");qeRec=null;render();toast("Schedule updated — sent to "+e.name,true);return}
   saved=saved.map(function(r){return r.id===e.id?rec:r});
+  /* 12.29 fix: a logged shift edited in Records also updates the staff member's phone (My Schedule + chat picture) */
+  var sOld=syncR&&syncR.sched&&syncR.sched[e.id];
+  if(sOld){var sPrev=Object.assign({},sOld);syncR.sched[e.id]=Object.assign({},sOld,{date:rec.date,from:rec.from,to:rec.to,floor:rec.floor,comp:rec.comp,key:rec.key});schCacheSave();
+    o2Flush(function(){syncReq("PATCH","/sched/"+e.id,{date:rec.date,from:rec.from,to:rec.to,floor:rec.floor,comp:rec.comp,key:rec.key}).catch(function(){})});
+    try{chShiftCard(rec,"chg",sPrev)}catch(x){}}
   persist();$("qe").classList.remove("open");qeRec=null;render();toast("Shift updated",true);
 };
 </script>
@@ -2983,12 +2992,12 @@ function chSendPhoto(uk,big,th,w,h){
   }).catch(function(err){try{delete syncR.chat[uk][id]}catch(x){}try{chThread(uk,true)}catch(x){}
     toast(/no email address|wrong key/.test(String(err))?"Photo not sent — the Google sender must be updated to v5.2 (see README).":"Photo not sent — check the internet and try again.")})}
 function chPhotoWire(){
-  var cam=$("chCam"),gal=$("chGal"),fc=$("chFileCam"),fg=$("chFileGal");if(!cam||cam._w)return;cam._w=1;
-  cam.onclick=function(){if(chCur())fc.click()};gal.onclick=function(){if(chCur())fg.click()};
+  var gal=$("chGal"),fg=$("chFileGal");if(!gal||gal._w)return;gal._w=1;
+  gal.onclick=function(){if(chCur())fg.click()};
   function got(inp){var f=inp.files&&inp.files[0],uk=chCur();inp.value="";if(!f||!uk)return;
     if(!/^image\//.test(f.type||"image/")){toast("Please choose a picture.");return}
     chPhotoShrink(f,function(big,th,w,h){chSendPhoto(uk,big,th,w,h)})}
-  fc.onchange=function(){got(fc)};fg.onchange=function(){got(fg)}}
+  fg.onchange=function(){got(fg)}}
 setTimeout(chPhotoWire,0);document.addEventListener("click",function(){chPhotoWire()},true);
 function chSetSeen(uk){syncR.chatSeen=syncR.chatSeen||{};syncR.chatSeen[uk]=Object.assign({},syncR.chatSeen[uk]||{});syncR.chatSeen[uk][CH_ROLE]=sNow();var o={};o[CH_ROLE]={".sv":"timestamp"};syncReq("PATCH","/chatSeen/"+uk,o).catch(function(){})}
 function chFrom(m){var dv=(syncR&&syncR.devices)||{},x=m.d&&dv[m.d],nm=x&&x.name&&x.name!=="Device"?x.name:"";return nm||(m.n&&m.n!=="Device"?m.n:"")||"Office"}
