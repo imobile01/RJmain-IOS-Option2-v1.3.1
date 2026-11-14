@@ -438,7 +438,7 @@ button,select,input,#pad button{touch-action:manipulation}
         <div class="row"><button type="button" class="bar selbtn" id="compBtn"><span id="compLbl">Select companion (optional)</span></button><input type="hidden" id="comp"></div>
       </div>
     </div>
-    <button class="save" id="save">Save to records</button>
+    <button class="save" id="save">Send to staff</button>
   </section>
 
   <section class="screen" id="s-rec">
@@ -491,7 +491,7 @@ button,select,input,#pad button{touch-action:manipulation}
     <div class="sub" id="chSub"></div>
     <div id="chList" class="chlist"></div>
     <div id="chThread" class="chthread" hidden><div id="chMsgs" class="chmsgs"></div>
-      <div class="chbar"><textarea id="chIn" rows="1" maxlength="1000" placeholder="Message…" enterkeyhint="send"></textarea><button id="chSend" type="button">Send</button></div></div>
+      <div class="chbar"><button id="chCam" class="chpb" type="button" aria-label="Take a photo">📷</button><button id="chGal" class="chpb" type="button" aria-label="Choose a photo">🖼️</button><input type="file" id="chFileCam" accept="image/*" capture="environment" hidden><input type="file" id="chFileGal" accept="image/*" hidden><textarea id="chIn" rows="1" maxlength="1000" placeholder="Message…" enterkeyhint="send"></textarea><button id="chSend" type="button">Send</button></div></div>
   </section>
 
   <nav class="tabs" id="tabs">
@@ -1547,7 +1547,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.23 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.28 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2110,17 +2110,17 @@ $("save").onclick=function(){
   var rec={id:editId||Date.now(),date:date,from:F12.h+":"+$("fm").value+" "+F12.a,to:T12.h+":"+$("tm").value+" "+T12.a,floor:floor+" – "+side,comp:comp,name:pname,key:date+" "+("0000"+f).slice(-4)};
   var ovl=ovFind(rec);if(ovl.length){ovWarn(rec,ovl);return}
   var wasEdit=!!editId;
-  if(wasEdit){if(!saved.some(function(r){return r.id===editId}))saved.push(rec);else saved=saved.map(function(r){return r.id===editId?rec:r});editId=null;$("save").textContent="Save to records"}
+  if(wasEdit){if(!saved.some(function(r){return r.id===editId}))saved.push(rec);else saved=saved.map(function(r){return r.id===editId?rec:r});editId=null;$("save").textContent="Send to staff"}
   else if(!schCreate(rec))saved.push(rec);
   persist();clearForm(true);
-  if(wasEdit){openF=pname;mode="";sel={};render();show("rec")}else{render();toast(schLast===pname?"Sent to "+pname+" — waiting for confirmation (Records → Schedules)":"Saved under "+pname,true);schLast=null}
+  if(wasEdit){openF=pname;mode="";sel={};render();show("rec")}else{render();toast(schLast===pname?"Sent to "+pname+" — waiting for them to accept and log it (Records → Schedules)":"Saved under "+pname,true);schLast=null}
 };
 $("tabs").onclick=function(e){
   var b=e.target.closest("button");if(!b)return;
   $("toast").classList.remove("on");
   if(b.dataset.s!=="rec")recUnlocked=false;
-  if(b.dataset.s==="rec"&&!recUnlocked){unlockRecords(function(){if(editId){editId=null;$("save").textContent="Save to records";clearForm()}show("rec")});return}
-  if(editId&&b.dataset.s==="rec"){editId=null;$("save").textContent="Save to records";clearForm()}
+  if(b.dataset.s==="rec"&&!recUnlocked){unlockRecords(function(){if(editId){editId=null;$("save").textContent="Send to staff";clearForm()}show("rec")});return}
+  if(editId&&b.dataset.s==="rec"){editId=null;$("save").textContent="Send to staff";clearForm()}
   show(b.dataset.s);
 };
 var names=[],rawN=null;
@@ -2617,13 +2617,20 @@ function renderSync(){
           toast("“"+(d.name||"Device")+"” removed permanently",true);renderSync()},function(e){toast("Couldn't remove: "+e)})},function(){})};r.appendChild(x)}
       box.appendChild(r)});
     W.appendChild(box);
-    var rk=Object.keys(dv).filter(function(k){return dv[k]&&dv[k].removed&&k!==me});
+    var rk=Object.keys(dv).filter(function(k){return dv[k]&&dv[k].removed&&!dv[k].gone&&k!==me});
     if(rk.length){var rh=document.createElement("div");rh.className="schsec";rh.style.margin="10px 4px 4px";rh.textContent="Removed devices ("+rk.length+")";W.appendChild(rh);
       var rb=document.createElement("div");rb.className="elist";
       rk.forEach(function(k){var d=dv[k],r=document.createElement("div");r.className="erow";var t=document.createElement("span");t.textContent="⛔ "+(d.name||"Device");t.style.opacity=".6";r.appendChild(t);
         var a=document.createElement("button");a.type="button";a.className="nx";a.textContent="↩︎";a.title="Allow "+(d.name||"Device")+" again";a.style.color="#34c759";
         a.onclick=function(){choose2("Allow “"+(d.name||"Device")+"” to join the team again?\n\nIt reconnects when Device Sync is turned on there.","Allow","Cancel",function(){syncReq("DELETE","/devices/"+k).then(function(){delete syncR.devices[k];toast("“"+(d.name||"Device")+"” can join again",true);renderSync()},function(e){toast("Couldn't change: "+e)})},function(){})};
-        r.appendChild(a);rb.appendChild(r)});W.appendChild(rb)}
+        r.appendChild(a);
+        /* 12.28: 🗑 delete from the list for good — the device stays blocked and can never join again */
+        var dl=document.createElement("button");dl.type="button";dl.className="nx";dl.textContent="🗑";dl.title="Delete "+(d.name||"Device")+" permanently";dl.setAttribute("aria-label","Delete permanently");dl.style.marginLeft="6px";
+        dl.onclick=function(){choose2("Delete “"+(d.name||"Device")+"” permanently?\n\nIt disappears from this list and stays blocked — it can never join the team again, and this can't be undone.","Delete","Cancel",function(){
+          syncReq("PATCH","/devices/"+k,{gone:true,goneAt:{".sv":"timestamp"}}).then(function(){if(syncR.devices[k])syncR.devices[k].gone=true;
+            var P=syncR.push||{};Object.keys(P).forEach(function(id){if(id===k){delete P[id];syncReq("DELETE","/push/"+id).catch(function(){})}});
+            toast("“"+(d.name||"Device")+"” deleted permanently",true);renderSync()},function(e){toast("Couldn't delete: "+e)})},function(){})};
+        r.appendChild(dl);rb.appendChild(r)});W.appendChild(rb)}
     /* v10.9: RJ Connect staff accounts (name + password): reset password / delete account / allow again */
     var uh=document.createElement("h3");var us=syncR.users||{},uk=Object.keys(us).filter(function(k){return us[k]&&us[k].name}).sort(function(a,b){return us[a].name.localeCompare(us[b].name)});
     var nAct=uk.filter(function(k){return !us[k].deleted}).length;
@@ -2741,12 +2748,13 @@ $("qeSave").onclick=function(){
   if(!$("qeFl").value||!$("qeSd").value){toast("Choose the floor and side.");return}
   var rec={id:e.id,date:date,from:F12.h+":"+fm+" "+F12.a,to:T12.h+":"+tm+" "+T12.a,floor:$("qeFl").value+" – "+$("qeSd").value,comp:$("qeCo").value,name:e.name,key:date+" "+("0000"+f).slice(-4)};
   var ovl2=ovFind(rec);if(ovl2.length){ovWarn(rec,ovl2);return}
-  if(e._s===2){var o2=(syncR.sched&&syncR.sched[e.id])||e,n2=Object.assign({},o2,rec);delete n2._s;syncR.sched=syncR.sched||{};syncR.sched[e.id]=n2;schCacheSave();
+  var oldS=Object.assign({},(syncR.sched&&syncR.sched[e.id])||e);
+  if(e._s===2){var o2=(syncR.sched&&syncR.sched[e.id])||e,n2=Object.assign({},o2,rec);chShiftCard(rec,"chg",oldS);delete n2._s;syncR.sched=syncR.sched||{};syncR.sched[e.id]=n2;schCacheSave();
     try{rec.u=sNow()}catch(x){}
     if(saved.some(function(r){return r.id===e.id}))saved=saved.map(function(r){return r.id===e.id?rec:r});else saved.push(rec);
-    persist();o2Flush(function(){syncReq("PATCH","/sched/"+e.id,{date:rec.date,from:rec.from,to:rec.to,floor:rec.floor,comp:rec.comp,key:rec.key}).catch(function(x){toast("Couldn't update: "+x)})});$("qe").classList.remove("open");qeRec=null;render();toast("Confirmed shift updated (also in Records)",true);return}
+    persist();o2Flush(function(){syncReq("PATCH","/sched/"+e.id,{date:rec.date,from:rec.from,to:rec.to,floor:rec.floor,comp:rec.comp,key:rec.key}).catch(function(x){toast("Couldn't update: "+x)})});$("qe").classList.remove("open");qeRec=null;render();toast("Logged shift updated (also in Records)",true);return}
   if(e._s){var r2=Object.assign({},rec,{status:"pending",at:{".sv":"timestamp"}});syncR.sched=syncR.sched||{};syncR.sched[e.id]=Object.assign({},rec,{status:"pending",at:Date.now()});schCacheSave();
-    syncReq("PUT","/sched/"+e.id,r2).catch(function(x){toast("Couldn't update: "+x)});$("qe").classList.remove("open");qeRec=null;render();toast("Schedule updated — sent to "+e.name,true);return}
+    syncReq("PUT","/sched/"+e.id,r2).catch(function(x){toast("Couldn't update: "+x)});chShiftCard(rec,"chg",oldS);$("qe").classList.remove("open");qeRec=null;render();toast("Schedule updated — sent to "+e.name,true);return}
   saved=saved.map(function(r){return r.id===e.id?rec:r});
   persist();$("qe").classList.remove("open");qeRec=null;render();toast("Shift updated",true);
 };
@@ -2782,57 +2790,56 @@ function schCreate(rec){
   var r=Object.assign({},rec,{status:"pending",at:{".sv":"timestamp"},by:lsGet("syncDevName","")||"Main"});
   syncR.sched=syncR.sched||{};syncR.sched[rec.id]=Object.assign({},rec,{status:"pending",at:Date.now()});schCacheSave();
   syncReq("PUT","/sched/"+rec.id,r).catch(function(x){toast("Couldn't send the schedule: "+x)});
+  chShiftCard(rec,"new");
   schLast=rec.name;return true;
 }
 function schLbl(e){var p=e.date.split("-"),d=new Date(p[0],p[1]-1,p[2]);return d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})+" · "+t12(e.from)+" – "+t12(e.to)+(overnight(e)?" (+1)":"")+" · "+String(e.floor||"").replace(" – "," ")+(e.comp?" · with "+e.comp:"")}
 function schFold(){
-  var L=schList(),np=L.filter(function(x){return x.status!=="confirmed"}).length,nc=L.length-np;
-  var f=document.createElement("button");f.type="button";f.className="fold schf "+(np?"alert":"ok");
+  var L=schList().filter(function(x){return x.status!=="confirmed"}),na=L.filter(function(x){return !x.accAt}).length,nk=L.length-na;
+  var f=document.createElement("button");f.type="button";f.className="fold schf "+(na?"alert":"ok");
   f.innerHTML='<span class="ficon"><span>📋</span></span><span class="fn"><b>Schedules</b><small></small></span><span class="fh"></span><span class="chev">›</span>';
-  f.querySelector(".fn small").textContent=np?np+" waiting for confirmation"+(nc?" · "+nc+" confirmed":""):(nc?nc+" confirmed":"Shifts you send to staff on RJ Connect");
-  if(np)f.querySelector(".fh").innerHTML='<span class="schbadge">'+np+'</span>';
+  f.querySelector(".fn small").textContent=L.length?(na?na+" waiting to accept":"")+(na&&nk?" · ":"")+(nk?nk+" accepted":""):"No shifts waiting · logged shifts are in Records";
+  if(na)f.querySelector(".fh").innerHTML='<span class="schbadge">'+na+'</span>';
   f.onclick=function(){o2SchOpen=true;render()};return f;
 }
 /* 12.10: send Records changes first, then the schedule change */
 function o2Flush(cb){if(!syncOn()){cb();return}clearTimeout(syncT);var n=0;(function go(){if(syncBusy&&n++<40){setTimeout(go,150);return}syncPush().then(cb,cb)})()}
 function renderSchedFolder(L){
-  $("seg").hidden=true;$("backBtn").hidden=false;$("backBtn").textContent="‹ Names";$("recTitle").textContent="Schedules";$("acts").innerHTML="";try{$("hint").textContent="Red = waiting for the staff to confirm (stays until confirmed) · Green = confirmed and saved to Records (cleared at 11:59 PM)"}catch(x){}
-  L.innerHTML="";var all=schList().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:parseT(a.from)-parseT(b.from)});
-  var pend=all.filter(function(x){return x.status!=="confirmed"}),conf=all.filter(function(x){return x.status==="confirmed"}).reverse();
-  if(!all.length){L.innerHTML='<div class="empty">No schedules yet. On the Schedule screen choose a staff member who uses RJ Connect and tap Save — it appears here in red until they confirm.</div>';return}
-  function row(e,ok){var r=document.createElement("div");r.className="schrow "+(ok?"green":"red");
+  /* 12.25: red = waiting for the staff to accept · green (moved down) = accepted, waiting to be logged ·
+     logged shifts leave this folder and are in Records under the staff member's name */
+  $("seg").hidden=true;$("backBtn").hidden=false;$("backBtn").textContent="‹ Names";$("recTitle").textContent="Schedules";$("acts").innerHTML="";try{$("hint").textContent="Red = waiting for the staff to accept · Green = accepted (Log opens at the start time) · Logged shifts move to Records under the staff member's name"}catch(x){}
+  L.innerHTML="";var all=schList().filter(function(x){return x.status!=="confirmed"}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:parseT(a.from)-parseT(b.from)});
+  var wait=all.filter(function(x){return !x.accAt}),acc=all.filter(function(x){return !!x.accAt});
+  if(!all.length){L.innerHTML='<div class="empty">No shifts waiting. Logged shifts are in Records under each staff member\'s name. To add one, go to the Schedule screen, choose a staff member who uses the staff app and tap Save.</div>';return}
+  function tm(t){return new Date(t).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}
+  function row(e){var ok=!!e.accAt,r=document.createElement("div");r.className="schrow "+(ok?"green":"red");
     r.innerHTML='<div class="si"><b></b><div class="m"></div><div class="st"></div></div><div class="sa"></div>';
     r.querySelector("b").textContent=e.name;r.querySelector(".m").textContent=schLbl(e)+(isStat(e)?" · ★ STAT":"");
-    var st=r.querySelector(".st");
-    if(ok)st.textContent="✓ Confirmed"+(e.confAt?" "+new Date(e.confAt).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"")+" · saved to Records";
-    else st.textContent=Date.now()>=schStart(e)?"⏳ Not confirmed yet":"⏳ Waiting for confirmation (opens "+schH12(e)+")";
-    if(ok){var sa2=r.querySelector(".sa");
-      var ed2=document.createElement("button");ed2.type="button";ed2.textContent="✏️";ed2.title="Edit";ed2.onclick=function(){openQE(Object.assign({},e,{_s:2}))};
-      var cx2=document.createElement("button");cx2.type="button";cx2.textContent="✕";cx2.style.color="#ff3b30";cx2.title="Delete this shift";
-      cx2.onclick=function(){choose2("Delete this confirmed shift for "+e.name+"?\n\n"+schLbl(e)+"\n\nIt is also removed from Records.","Delete","Keep",function(){schMoved[e.id]=1;if(syncR.sched)delete syncR.sched[e.id];schCacheSave();
-        saved=saved.filter(function(x){return x.id!==e.id});persist();render();toast("Shift deleted",true);o2Flush(function(){syncReq("DELETE","/sched/"+e.id).catch(function(){})})},function(){})};
-      sa2.appendChild(ed2);sa2.appendChild(cx2)}
-    if(!ok){var sa=r.querySelector(".sa");
-      var ed=document.createElement("button");ed.type="button";ed.textContent="✏️";ed.title="Edit";ed.onclick=function(){openQE(Object.assign({},e,{_s:1}))};
-      var cx=document.createElement("button");cx.type="button";cx.textContent="✕";cx.style.color="#ff3b30";cx.title="Cancel this shift";
-      cx.onclick=function(){choose2("Cancel this shift for "+e.name+"?\n\n"+schLbl(e),"Cancel shift","Keep",function(){delete syncR.sched[e.id];schCacheSave();syncReq("DELETE","/sched/"+e.id).catch(function(){});render();toast("Shift cancelled",true)},function(){})};
-      sa.appendChild(ed);sa.appendChild(cx)}
-    return r}
-  if(pend.length){var h1=document.createElement("div");h1.className="schsec";h1.textContent="Waiting for confirmation ("+pend.length+")";L.appendChild(h1);pend.forEach(function(e){L.appendChild(row(e,false))})}
-  if(conf.length){var h2=document.createElement("div");h2.className="schsec";h2.textContent="Confirmed ("+conf.length+")";L.appendChild(h2);conf.forEach(function(e){L.appendChild(row(e,true))})}
+    var late=Date.now()>=schStart(e);
+    r.querySelector(".st").textContent=ok?"👍 Accepted "+tm(e.accAt)+" · "+(late?"not logged yet":"log opens "+schH12(e)):(late?"⏳ Not accepted yet · shift has started":"⏳ Waiting for "+String(e.name).split(" ")[0]+" to accept");
+    var sa=r.querySelector(".sa");
+    var ed=document.createElement("button");ed.type="button";ed.textContent="✏️";ed.title="Edit";ed.onclick=function(){openQE(Object.assign({},e,{_s:1}))};
+    var cx=document.createElement("button");cx.type="button";cx.textContent="✕";cx.style.color="#ff3b30";cx.title="Cancel this shift";
+    cx.onclick=function(){choose2("Cancel this shift for "+e.name+"?\n\n"+schLbl(e),"Cancel shift","Keep",function(){delete syncR.sched[e.id];schCacheSave();syncReq("DELETE","/sched/"+e.id).catch(function(){});render();toast("Shift cancelled",true)},function(){})};
+    sa.appendChild(ed);sa.appendChild(cx);return r}
+  if(wait.length){var h1=document.createElement("div");h1.className="schsec";h1.textContent="Waiting to accept ("+wait.length+")";L.appendChild(h1);wait.forEach(function(e){L.appendChild(row(e))})}
+  if(acc.length){var h2=document.createElement("div");h2.className="schsec";h2.textContent="Accepted · waiting to be logged ("+acc.length+")";L.appendChild(h2);acc.forEach(function(e){L.appendChild(row(e))})}
 }
 /* Main: confirmed shifts are saved to Records (once), old confirmed ones are cleaned up */
 var schMoved={};
+var accSeen=(function(){try{return JSON.parse(localStorage.getItem("accSeen")||"null")}catch(x){return null}})(),accInit=!accSeen,accCh=false;accSeen=accSeen||{};
 function schProcess(){
   if(typeof C_TEAM!=="undefined"||!syncOn()||syncState!=="live")return;
   var o=(syncR&&syncR.sched)||{},have={},ch=false,cut=ymd(new Date(Date.now()-30*864e5));
   saved.forEach(function(r){have[r.id]=1});loadSaved().forEach(function(h){(h.recs||[]).forEach(function(r){have[r.id]=1})});
   Object.keys(o).forEach(function(k){var e=o[k];if(!e||!e.id)return;
-    if(e.status==="confirmed"&&!have[e.id]&&!schMoved[e.id]){schMoved[e.id]=1;saved.push({id:e.id,date:e.date,from:e.from,to:e.to,floor:e.floor,comp:e.comp||"",name:e.name,key:e.key||e.date});ch=true;try{if(window.RJAndroid&&RJAndroid.notifyShift)RJAndroid.notifyShift("✅ "+(e.confBy||e.name)+" confirmed",schLbl(e))}catch(x){}}
+    if(e.status==="confirmed"&&!have[e.id]&&!schMoved[e.id]){schMoved[e.id]=1;saved.push({id:e.id,date:e.date,from:e.from,to:e.to,floor:e.floor,comp:e.comp||"",name:e.name,key:e.key||e.date});ch=true;try{if(window.RJAndroid&&RJAndroid.notifyShift)RJAndroid.notifyShift("✅ "+(e.confBy||e.name)+" logged a shift",schLbl(e))}catch(x){}}
+    if(e.accAt&&!accSeen[e.id]){accSeen[e.id]=1;accCh=true;if(!accInit){try{if(window.RJAndroid&&RJAndroid.notifyShift)RJAndroid.notifyShift("👍 "+(e.accBy||e.name)+" accepted a shift",schLbl(e))}catch(x){}}}
     if(schCleared(e)&&(have[e.id]||schMoved[e.id])){delete o[k];syncReq("DELETE","/sched/"+k).catch(function(){})}   /* confirmed ones are cleared at 11:59 PM */
   });
   schCacheSave();
-  if(ch){persist();toast("Confirmed shift saved to Records",true)}
+  if(accCh){try{localStorage.setItem("accSeen",JSON.stringify(accSeen))}catch(x){}}accInit=false;accCh=false;
+  if(ch){persist();toast("Shift logged — saved to Records under the staff member's name",true)}
   if($("s-rec").classList.contains("on")&&openF===null&&recView==="f")render();
 }
 setInterval(function(){try{schProcess()}catch(x){}},60000);
@@ -2853,7 +2860,7 @@ var _schAp=syncApply;syncApply=function(){var r=_schAp.apply(this,arguments);try
 .chthread{flex:1;min-height:0;display:flex;flex-direction:column}
 .chthread[hidden],.chlist[hidden]{display:none!important}
 .chmsgs{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:6px 2px;display:flex;flex-direction:column}
-.chb{max-width:80%;padding:8px 13px;border-radius:18px;margin:3px 0 1px;font-size:16px;line-height:1.32;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.chb .chimg{display:block;width:240px;max-width:100%;border-radius:14px;margin:6px 0 2px;cursor:zoom-in;box-shadow:0 4px 12px rgba(0,0,0,.12)} #chZoom{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:18px} #chZoom.on{display:flex} #chZoom img{max-width:100%;max-height:100%;border-radius:16px}  .chbar .chpb{flex:none;width:42px;height:42px;border:0;border-radius:50%;background:rgba(127,127,140,.14);font-size:20px;line-height:42px;padding:0;margin-right:6px;align-self:flex-end} .chb.ph{padding:4px;background:transparent!important;border:0!important} .chb .chphoto{display:block;width:230px;max-width:100%;border-radius:14px;cursor:zoom-in;background:#ddd;object-fit:cover} .chb .chphoto.ld{filter:blur(6px)} .chb .phs{font-size:12px;opacity:.7;margin-top:3px} .chb{max-width:80%;padding:8px 13px;border-radius:18px;margin:3px 0 1px;font-size:16px;line-height:1.32;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
 .chb.me{align-self:flex-end;background:#0a84ff;color:#fff;border-bottom-right-radius:6px}
 .chb.th{align-self:flex-start;background:var(--card);color:var(--text);border:1px solid var(--line);border-bottom-left-radius:6px}
 .cht{font-size:11px;color:var(--mute);margin:0 6px 5px}.cht.me{align-self:flex-end}.cht.th{align-self:flex-start}
@@ -2873,7 +2880,7 @@ var _schAp=syncApply;syncApply=function(){var r=_schAp.apply(this,arguments);try
 var CH_LS=(typeof LS!=="undefined")?LS:localStorage,CH_ROLE=(typeof C_TEAM!=="undefined")?"s":"m",CH_KEEP=30*864e5,chOpen=null;
 function chAll(){return (syncR&&syncR.chat)||{}}
 function chSeenAll(){return (syncR&&syncR.chatSeen)||{}}
-function chMsgs(uk){var o=chAll()[uk]||{};return Object.keys(o).map(function(k){var m=o[k];if(!m||typeof m.t!=="string")return null;return {id:k,f:m.f,t:m.t,n:m.n||"",d:m.d||"",at:typeof m.at==="number"?m.at:sNow()}}).filter(Boolean).sort(function(a,b){return a.at-b.at||(a.id<b.id?-1:1)})}
+function chMsgs(uk){var o=chAll()[uk]||{};return Object.keys(o).map(function(k){var m=o[k];if(!m||typeof m.t!=="string")return null;return {id:k,f:m.f,t:m.t,n:m.n||"",d:m.d||"",card:m.card||null,ph:m.ph||"",th:m.th||"",w:m.w||0,h:m.h||0,sending:m.sending||0,at:typeof m.at==="number"?m.at:sNow()}}).filter(Boolean).sort(function(a,b){return a.at-b.at||(a.id<b.id?-1:1)})}
 function chSeen(uk,who){var s=chSeenAll()[uk]||{};return typeof s[who]==="number"?s[who]:0}
 function chOther(){return CH_ROLE==="m"?"s":"m"}
 function chUnread(uk){var seen=chSeen(uk,CH_ROLE),o=chOther();return chMsgs(uk).filter(function(m){return m.f===o&&m.at>seen}).length}
@@ -2886,6 +2893,103 @@ function chSend(uk,text){
   chSetSeen(uk);
   syncReq("PUT","/chat/"+uk+"/"+id,{f:CH_ROLE,t:text,n:me,d:syncDevId(),at:{".sv":"timestamp"}}).catch(function(){try{delete syncR.chat[uk][id]}catch(x){}toast("Message not sent — check the internet and try again.");chRender()});
   return true}
+
+/* ===== 12.26 / 2.18: shift picture in chat. The office sends a small "shift card" message (just the shift details);
+   each phone draws the picture itself, so chat stays small and Firebase stays on the free plan. ===== */
+var chCardCache={};
+function chCardImg(c,id){
+  if(id&&chCardCache[id])return chCardCache[id];
+  var W=600,H=c.o?470:430,cv=document.createElement("canvas"),k=2;cv.width=W*k;cv.height=H*k;var g=cv.getContext("2d");g.scale(k,k);
+  var F="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  function rr(x,y,w,h,r,fill){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();g.fillStyle=fill;g.fill()}
+  function tx(t,x,y,sz,wt,col,al){g.font=(wt||"400")+" "+sz+"px "+F;g.fillStyle=col;g.textAlign=al||"left";g.textBaseline="alphabetic";g.fillText(t,x,y)}
+  var gr=g.createLinearGradient(0,0,W,H);gr.addColorStop(0,"#dbe9ff");gr.addColorStop(1,"#f7e1f1");g.fillStyle=gr;g.fillRect(0,0,W,H);
+  rr(18,18,W-36,H-36,26,"#ffffff");
+  var chg=c.k==="chg",hc=chg?"#ff9500":"#0a84ff";rr(18,18,W-36,64,26,hc);g.fillStyle=hc;g.fillRect(18,58,W-36,24);
+  tx(chg?"✏️  SHIFT CHANGED":"🗓️  NEW SHIFT",42,60,24,"800","#fff");
+  tx("RJ ShiftLog",W-42,60,18,"700","rgba(255,255,255,.9)","right");
+  var e={date:c.date,from:c.from,to:c.to,floor:c.floor||"",comp:c.comp||""},p=String(c.date).split("-"),dt=new Date(+p[0],p[1]-1,+p[2]);
+  tx(c.name||"",42,128,30,"800","#1c1c1e");
+  rr(42,148,96,104,20,"#ff3b30");
+  tx(dt.toLocaleDateString("en-US",{weekday:"short"}).toUpperCase(),90,176,17,"800","#fff","center");
+  tx(String(dt.getDate()),90,222,44,"800","#fff","center");
+  tx(dt.toLocaleDateString("en-US",{month:"short"}),90,244,16,"600","#fff","center");
+  var tt="";try{tt=t12(e.from)+" – "+t12(e.to)+(overnight(e)?" (+1)":"")}catch(x){tt=e.from+" – "+e.to}
+  tx(tt,160,186,30,"800","#1c1c1e");
+  var hr="";try{hr=r2d(dur(e))+" hrs"}catch(x){}
+  tx(dt.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})+(hr?" · "+hr:""),160,216,18,"500","#6b6b70");
+  var fp=String(e.floor).split(" – ");tx("📍 "+(fp[0]||"")+(fp[1]?" · "+fp[1]:""),160,248,20,"600","#3a3a3c");
+  var y=290;
+  if(e.comp){tx("👥 With "+e.comp,42,y,20,"600","#3a3a3c");y+=36}
+  if(c.o){var o={date:c.o.date,from:c.o.from,to:c.o.to},op=String(o.date).split("-"),od=new Date(+op[0],op[1]-1,+op[2]),ot="";try{ot=t12(o.from)+" – "+t12(o.to)}catch(x){ot=o.from+" – "+o.to}
+    var wt="Was: "+od.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})+" · "+ot;tx(wt,42,y,18,"500","#8e8e93");g.font="500 18px "+F;var w=g.measureText(wt).width;g.fillStyle="#8e8e93";g.fillRect(42,y-6,w,1.5);y+=36}
+  rr(42,y-4,W-84,58,16,"#f2f6ff");
+  var lo="";try{lo=schH12(e)}catch(x){lo=t12(e.from)}
+  tx("👍 Accept it in My Schedule  ·  ✓ Log opens at "+lo,W/2,y+32,18,"700","#0a6fd6","center");
+  var sent=c.at?new Date(c.at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
+  tx("Sent by "+(c.by||"the office")+(sent?" · "+sent:""),W/2,H-34,15,"500","#8e8e93","center");
+  var u="";try{u=cv.toDataURL("image/png")}catch(x){}
+  if(id)chCardCache[id]=u;return u}
+function chZoom(src){var z=document.getElementById("chZoom");if(!z){z=document.createElement("div");z.id="chZoom";z.onclick=function(){z.classList.remove("on")};z.innerHTML='<img alt="Shift">';document.body.appendChild(z)}
+  z.querySelector("img").src=src;z.classList.add("on")}
+/* 12.26: the main button says "Send to staff" (or "Save to records" for a name that has no staff-app account) */
+function updSaveLbl(){try{if(editId)return;var n=$("pname").value,b=$("save");if(!b)return;b.textContent=(!n||(typeof isStaff==="function"&&isStaff(n)))?"Send to staff":"Save to records"}catch(x){}}
+setTimeout(function(){try{var _sp=setPName;setPName=function(){var r=_sp.apply(this,arguments);updSaveLbl();return r};updSaveLbl()}catch(x){}},0);
+/* 12.26: after sending or changing a shift, post its picture in that staff member's chat */
+function chShiftCard(rec,kind,old){try{
+  var uk=pushUkOf(rec.name);if(!uk||!syncOn())return;
+  var id="c"+sNow().toString(36)+Math.random().toString(36).slice(2,6),me=chMe(),by=lsGet("syncDevName","")||me||"Office";
+  var card={k:kind,name:rec.name,date:rec.date,from:rec.from,to:rec.to,floor:rec.floor||"",comp:rec.comp||"",by:by,at:sNow()};
+  if(old&&(old.date!==rec.date||old.from!==rec.from||old.to!==rec.to))card.o={date:old.date,from:old.from,to:old.to};
+  var t=(kind==="chg"?"✏️ Your shift was changed: ":"🗓️ New shift: ")+schLbl(rec);
+  syncR.chat=syncR.chat||{};syncR.chat[uk]=syncR.chat[uk]||{};syncR.chat[uk][id]={f:CH_ROLE,t:t,card:card,n:me,d:syncDevId(),at:sNow()};
+  syncReq("PUT","/chat/"+uk+"/"+id,{f:CH_ROLE,t:t,card:card,n:me,d:syncDevId(),at:{".sv":"timestamp"}}).catch(function(){try{delete syncR.chat[uk][id]}catch(x){}});
+  try{chBadges()}catch(x){}
+}catch(x){}}
+
+/* ===== 12.27 / 2.19: 📷 camera and 🖼️ gallery photos in Chat.
+   The photo is made smaller on the phone, saved in the Google sender's Drive folder ("RJ ShiftLog chat photos"),
+   and the chat message only carries its id + a tiny preview, so Firebase stays small. Needs Google sender v5.2. ===== */
+var chPhotoMem={};
+function chPhCache(){return (window.caches&&caches.open)?caches.open("rj-photos"):Promise.reject("no cache")}
+function chPhPost(o){o.key=PUSH_KEY;return fetch(PUSH_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(o)}).then(function(r){return r.json()})}
+function chPhotoLoad(id){
+  if(chPhotoMem[id])return Promise.resolve(chPhotoMem[id]);
+  return chPhCache().then(function(c){return c.match("/rjph/"+id).then(function(r){return r?r.text():null})}).catch(function(){return null}).then(function(src){
+    if(src){chPhotoMem[id]=src;return src}
+    return chPhPost({action:"photo_get",id:id}).then(function(j){if(!j||!j.ok||!j.data)throw (j&&j.error)||"no photo";
+      var s="data:image/jpeg;base64,"+j.data;chPhotoMem[id]=s;chPhCache().then(function(c){return c.put("/rjph/"+id,new Response(s))}).catch(function(){});return s})})}
+function chPhotoShrink(file,cb){
+  var url=URL.createObjectURL(file),img=new Image();
+  img.onload=function(){try{
+    var w=img.naturalWidth,h=img.naturalHeight,s=Math.min(1,1280/Math.max(w,h)),cw=Math.max(1,Math.round(w*s)),ch=Math.max(1,Math.round(h*s));
+    var cv=document.createElement("canvas");cv.width=cw;cv.height=ch;cv.getContext("2d").drawImage(img,0,0,cw,ch);
+    var big=cv.toDataURL("image/jpeg",0.72),t=Math.min(1,40/Math.max(cw,ch)),tv=document.createElement("canvas");tv.width=Math.max(1,Math.round(cw*t));tv.height=Math.max(1,Math.round(ch*t));
+    tv.getContext("2d").drawImage(cv,0,0,tv.width,tv.height);var th=tv.toDataURL("image/jpeg",0.5);URL.revokeObjectURL(url);cb(big,th,cw,ch)}catch(x){URL.revokeObjectURL(url);toast("Couldn't open that picture.")}};
+  img.onerror=function(){URL.revokeObjectURL(url);toast("Couldn't open that picture. Try another one.")};img.src=url}
+function chSendPhoto(uk,big,th,w,h){
+  if(!syncOn()){toast("Not connected — turn on sync first.");return}
+  var id="c"+sNow().toString(36)+Math.random().toString(36).slice(2,6),me=chMe(),tmp="tmp_"+id;chPhotoMem[tmp]=big;
+  syncR.chat=syncR.chat||{};syncR.chat[uk]=syncR.chat[uk]||{};syncR.chat[uk][id]={f:CH_ROLE,t:"📷 Photo",ph:tmp,th:th,w:w,h:h,n:me,d:syncDevId(),at:sNow(),sending:1};
+  chSetSeen(uk);try{chThread(uk,true)}catch(x){}
+  chPhPost({action:"photo_put",data:big.split(",")[1],name:id+".jpg"}).then(function(j){
+    if(!j||!j.ok||!j.id)throw (j&&j.error)||"failed";
+    chPhotoMem[j.id]=big;chPhCache().then(function(c){return c.put("/rjph/"+j.id,new Response(big))}).catch(function(){});
+    var msg={f:CH_ROLE,t:"📷 Photo",ph:j.id,th:th,w:w,h:h,n:me,d:syncDevId(),at:{".sv":"timestamp"}};
+    syncR.chat[uk][id]=Object.assign({},msg,{at:sNow()});
+    return syncReq("PUT","/chat/"+uk+"/"+id,msg).then(function(){
+      try{if(PUSH_ROLE==="m")pushToStaff(uk,lsGet("syncDevName","")||"Office","📷 Photo","chat");else pushToMains(myName()||"Staff","📷 Photo","chat")}catch(x){}
+      try{chThread(uk,true);chBadges()}catch(x){}})
+  }).catch(function(err){try{delete syncR.chat[uk][id]}catch(x){}try{chThread(uk,true)}catch(x){}
+    toast(/no email address|wrong key/.test(String(err))?"Photo not sent — the Google sender must be updated to v5.2 (see README).":"Photo not sent — check the internet and try again.")})}
+function chPhotoWire(){
+  var cam=$("chCam"),gal=$("chGal"),fc=$("chFileCam"),fg=$("chFileGal");if(!cam||cam._w)return;cam._w=1;
+  cam.onclick=function(){if(chCur())fc.click()};gal.onclick=function(){if(chCur())fg.click()};
+  function got(inp){var f=inp.files&&inp.files[0],uk=chCur();inp.value="";if(!f||!uk)return;
+    if(!/^image\//.test(f.type||"image/")){toast("Please choose a picture.");return}
+    chPhotoShrink(f,function(big,th,w,h){chSendPhoto(uk,big,th,w,h)})}
+  fc.onchange=function(){got(fc)};fg.onchange=function(){got(fg)}}
+setTimeout(chPhotoWire,0);document.addEventListener("click",function(){chPhotoWire()},true);
 function chSetSeen(uk){syncR.chatSeen=syncR.chatSeen||{};syncR.chatSeen[uk]=Object.assign({},syncR.chatSeen[uk]||{});syncR.chatSeen[uk][CH_ROLE]=sNow();var o={};o[CH_ROLE]={".sv":"timestamp"};syncReq("PATCH","/chatSeen/"+uk,o).catch(function(){})}
 function chFrom(m){var dv=(syncR&&syncR.devices)||{},x=m.d&&dv[m.d],nm=x&&x.name&&x.name!=="Device"?x.name:"";return nm||(m.n&&m.n!=="Device"?m.n:"")||"Office"}
 function chDay(ms){var d=new Date(ms),t=new Date(),y=new Date(t.getFullYear(),t.getMonth(),t.getDate()-1);
@@ -2902,7 +3006,7 @@ function chThread(uk,force){
   var lastDay="",lastMine=-1;L.forEach(function(m,i){if(m.f===CH_ROLE)lastMine=i});
   L.forEach(function(m,i){
     var dy=chDay(m.at);if(dy!==lastDay){lastDay=dy;var d=document.createElement("div");d.className="chday";d.textContent=dy;box.appendChild(d)}
-    var mine=m.f===CH_ROLE,b=document.createElement("div");b.className="chb "+(mine?"me":"th");b.textContent=m.t;box.appendChild(b);
+    var mine=m.f===CH_ROLE,b=document.createElement("div");b.className="chb "+(mine?"me":"th");b.textContent=(m.ph&&m.t==="📷 Photo")?"":m.t;if(m.ph){b.classList.add("ph");var pi=document.createElement("img");pi.className="chphoto";pi.alt="Photo";if(m.w&&m.h)pi.style.aspectRatio=m.w+"/"+m.h;var mem=chPhotoMem[m.ph];pi.src=mem||m.th||"";if(!mem)pi.classList.add("ld");pi.onclick=function(){if(chPhotoMem[m.ph])chZoom(chPhotoMem[m.ph])};b.appendChild(pi);if(m.sending){var ps=document.createElement("div");ps.className="phs";ps.textContent="Sending…";b.appendChild(ps)}if(!mem)chPhotoLoad(m.ph).then(function(src){pi.src=src;pi.classList.remove("ld")}).catch(function(){var ps2=document.createElement("div");ps2.className="phs";ps2.textContent="Photo not available";b.appendChild(ps2)})}if(m.card){var ci=document.createElement("img");ci.className="chimg";ci.alt="Shift";ci.src=chCardImg(m.card,m.id);ci.onclick=function(){chZoom(ci.src)};b.appendChild(ci)}box.appendChild(b);
     var t=document.createElement("div");t.className="cht "+(mine?"me":"th");
     t.textContent=(CH_ROLE==="s"&&!mine?chFrom(m)+" · ":"")+(CH_ROLE==="m"&&mine&&m.n?m.n+" · ":"")+chTime(m.at)+(i===lastMine?(os>=m.at?" · Seen":" · Sent"):"");box.appendChild(t)});
   if(atEnd||force)box.scrollTop=box.scrollHeight;
@@ -3052,7 +3156,7 @@ var _pushReq=syncReq;syncReq=function(method,path,body){
   if(m&&p&&p.then){var id=m[1],before=pushSnap[id];
     p.then(function(){try{
       if(PUSH_ROLE==="s"&&method==="PATCH"&&body&&body.status==="confirmed"){var e=(syncR.sched&&syncR.sched[id])||before;
-        if(e)pushToMains("✅ "+(myName()||e.name)+" confirmed",pushShiftLbl(e),"conf")}
+        if(e)pushToMains("✅ "+(myName()||e.name)+" logged a shift",pushShiftLbl(e),"conf")}
       if(PUSH_ROLE==="m"){var uk;
         if(method==="PUT"&&body&&body.status==="pending"&&(uk=pushUkOf(body.name)))
           pushToStaff(uk,before?"✏️ Shift changed":"🗓️ New shift",pushShiftLbl(body),"sched");
