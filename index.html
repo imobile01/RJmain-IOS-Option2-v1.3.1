@@ -1595,7 +1595,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.38 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.40 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2935,9 +2935,11 @@ var _schAp=syncApply;syncApply=function(){var r=_schAp.apply(this,arguments);try
 var CH_LS=(typeof LS!=="undefined")?LS:localStorage,CH_ROLE=(typeof C_TEAM!=="undefined")?"s":"m",CH_KEEP=30*864e5,chOpen=null;
 var syncGotRoot=window.syncGotRoot||false,chCacheT=0,CH_CK=["chat","chatSeen","users","sched"];
 function chCacheKey(){var p="";try{p=CH_LS.getItem("syncPath")||CH_LS.getItem("syncTeam")||""}catch(x){}return "chCache|"+p}
-function chCacheSave(){if(!syncGotRoot||!syncR)return;var n=Date.now();if(n-chCacheT<2000)return;chCacheT=n;
+function chCacheSave(){if(!syncGotRoot||!syncR||window.rjNoCache||chCacheKey()==="chCache|")return;var n=Date.now();if(n-chCacheT<2000)return;chCacheT=n;
   try{var o={at:n};CH_CK.forEach(function(k){if(syncR[k])o[k]=syncR[k]});var js=JSON.stringify(o);if(js.length>1500000)js=js.replace(/,"th":"[^"]*"/g,"");CH_LS.setItem(chCacheKey(),js)}catch(x){}}
-(function(){try{if(syncGotRoot)return;var o=JSON.parse(CH_LS.getItem(chCacheKey())||"null");if(!o)return;CH_CK.forEach(function(k){if(o[k]&&!syncR[k])syncR[k]=o[k]})}catch(x){}})();
+(function(){try{var w=function(o,c){if(!o||typeof o.clear!=="function")return;var f=o.clear;o.clear=function(){window.rjNoCache=true;return f.apply(this,arguments)}};
+  if(CH_LS===window.localStorage)w(Storage.prototype);else w(CH_LS)}catch(x){}})();
+(function(){try{if(syncGotRoot||chCacheKey()==="chCache|")return;var o=JSON.parse(CH_LS.getItem(chCacheKey())||"null");if(!o)return;CH_CK.forEach(function(k){if(o[k]&&!syncR[k])syncR[k]=o[k]})}catch(x){}})();
 setInterval(chCacheSave,5000);addEventListener("pagehide",function(){chCacheT=0;chCacheSave()});
 document.addEventListener("visibilitychange",function(){if(document.hidden){chCacheT=0;chCacheSave()}});
 function chAll(){chCacheSave();return (syncR&&syncR.chat)||{}}
@@ -3110,7 +3112,7 @@ function chRender(force){
   var S=chStaff();$("chSub").textContent=S.length?S.length+" staff on RJ Connect":"";
   var sig=syncOn()+"|"+JSON.stringify(S.map(function(s){return [s.k,s.name,s.un,s.last&&[s.last.id,s.last.at]]}));if(!force&&sig===chLSig)return;chLSig=sig;chSig="";
   list.innerHTML="";
-  if(!lsGet("syncDevName","")){var nc=document.createElement("div");nc.className="chname";
+  if(false){var nc=document.createElement("div");nc.className="chname";
     nc.innerHTML='<b>Your name in chat</b><span>Staff see this name on your messages and notifications.</span><div class="chbar"><input id="chNm" maxlength="40" placeholder="e.g. Paul or RJ Office"><button type="button" id="chNmGo">Save</button></div>';
     list.appendChild(nc);$("chNmGo").onclick=function(){var v=$("chNm").value.trim().replace(/\s+/g," ");if(v.length<2){toast("Type a name (at least 2 letters).");return}
       try{localStorage.setItem("syncDevName",v)}catch(x){}if(syncOn())syncReq("PATCH","/devices/"+syncDevId(),{name:v}).catch(function(){});toast("Saved — staff will see “"+v+"”",true);chLSig="";chRender(true)}}
@@ -3374,7 +3376,7 @@ var _rmRS=renderSync;renderSync=function(){var r=_rmRS.apply(this,arguments);try
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}
 /* ===== 12.31 / 2.21: 🔄 Refresh app — gets the newest version from the same link (GitHub Pages) and restarts.
    Your data (records, schedules, chat, sign-in) stays; only the app's stored copy is replaced. ===== */
-var RJ_VER="12.38";
+var RJ_VER="12.40";
 function rjRefresh(){
   if(window.RJAndroid){try{toast("Android: install the new app file (APK) to update this app.")}catch(x){}return}
   try{toast("Getting the newest version…",true)}catch(x){}
@@ -3387,7 +3389,7 @@ function rjRefresh(){
 (function(){var prev=null;try{prev=sessionStorage.getItem("rjUpd");sessionStorage.removeItem("rjUpd")}catch(x){}
   try{if(/[?&]u=\d+/.test(location.search))history.replaceState(history.state,"",location.pathname+location.hash)}catch(x){}
   var ui=null;try{ui=JSON.parse(sessionStorage.getItem("rjUpdUI")||"null");sessionStorage.removeItem("rjUpdUI")}catch(x){}
-  if(prev&&ui)setTimeout(function(){try{if(ui.o&&typeof chOpen!=="undefined")chOpen=ui.o;if(ui.s)show(ui.s);var ci=document.getElementById("chIn");if(ci&&ui.d){ci.value=ui.d;try{ci.dispatchEvent(new Event("input"))}catch(x){}}}catch(x){}},400);
+  if(prev&&ui)setTimeout(function(){try{if(ui.o&&typeof chOpen!=="undefined")chOpen=ui.o;if(ui.s&&document.getElementById("s-"+ui.s))show(ui.s);var ci=document.getElementById("chIn");if(ci&&ui.d){ci.value=ui.d;try{ci.dispatchEvent(new Event("input"))}catch(x){}}}catch(x){}},400);
   if(prev)setTimeout(function(){try{toast(prev!==RJ_VER?"✓ Updated to version "+RJ_VER:"✓ Refreshed — version "+RJ_VER+" is the newest",true)}catch(x){}},1500)})();
 </script>
 </body>
