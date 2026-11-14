@@ -53,7 +53,7 @@
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>
-:root{--bg:#f2f2f7;--card:#fff;--text:#111;--mute:#6b6b76;--acc:#0a84ff;--line:#e0e0e6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root{--bg:#f2f2f7;--card:#fff;--text:#111;--mute:#6b6b76;--acc:#0a84ff;--line:#e0e0e6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:0}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--mute:#9a9aa5;--line:#38383a}}
 :root[data-theme="dark"]{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--mute:#9a9aa5;--line:#38383a}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -127,6 +127,9 @@ h1{font-weight:700;letter-spacing:-.02em}
 .panel{background:var(--panel);border-radius:28px 28px 0 0;border-bottom:0}
 .box{border-radius:26px}
 .tabs{margin:0 16px 8px;padding:6px;border-radius:32px}
+/* full screen to the bottom edge */
+html{height:100%;background:var(--wall);background-attachment:fixed}#app{position:fixed;left:0;right:0;bottom:0;top:env(safe-area-inset-top,0px);height:auto}
+.tabs{margin-bottom:max(8px,calc(env(safe-area-inset-bottom,0px) - 6px))}
 .tabs button{border-radius:24px;transition:background .25s,color .25s}
 .tabs button.on{background:rgba(120,130,175,.22)}
 .save{margin:8px 0 0;border-radius:28px;border:1px solid rgba(255,255,255,.45);background:linear-gradient(180deg,rgba(64,160,255,.95),rgba(0,104,230,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 10px 26px rgba(10,132,255,.38)}
@@ -739,11 +742,12 @@ function renderEntMenu(){
   Array.prototype.forEach.call(document.querySelectorAll("#entWrap .esec"),function(x){x.hidden=x.dataset.sec!==entSec});
   if(entSec){
     var it=ENT.filter(function(x){return x[0]===entSec})[0];
-    $("backBtn").hidden=false;$("backBtn").textContent="‹ Entry";$("recTitle").textContent=it[2];
+    $("backBtn").hidden=false;$("backBtn").textContent=statFromRec?"‹ Records":"‹ Entry";$("recTitle").textContent=it[2];
     $("seg").hidden=true;$("entWrap").scrollTop=0;if(entSec==="H")renderCal();if(entSec==="SY")renderSync();return;
   }
   $("backBtn").hidden=true;$("recTitle").textContent="Records";$("seg").hidden=false;
   ENT.forEach(function(it){
+    if(it[0]==="H")return;   /* 12.32: STAT / Holidays is now in Records → Names, below Schedules */
     var b=document.createElement("button");b.type="button";b.className="fold emi";
     b.innerHTML='<span class="eic"></span><span class="fn"><b></b><small></small></span><span class="chev">›</span>';
     b.querySelector(".eic").textContent=it[1];b.querySelector(".fn b").textContent=it[2];
@@ -753,11 +757,16 @@ function renderEntMenu(){
     b.onclick=function(){try{history.pushState({e:1},"")}catch(x){}entSec=it[0];renderEntMenu()};
     M.appendChild(b);
   });
+  var rf=document.createElement("button");rf.type="button";rf.className="fold emi";
+  rf.innerHTML='<span class="eic">🔄</span><span class="fn"><b>Refresh app</b><small></small></span><span class="chev">›</span>';
+  rf.querySelector(".fn small").textContent=window.RJAndroid?"Version "+RJ_VER+" · Android updates by installing the new APK":"Version "+RJ_VER+" · get the newest version and restart";
+  rf.onclick=function(){choose2("Refresh the app?\n\nIt gets the newest version from the app link and restarts. Your records, schedules and chat stay.","Refresh","Cancel",rjRefresh,function(){})};
+  M.appendChild(rf);
 }
 function nameOf(e){return e.name||"No name"}
 function folderRecs(nm){return saved.filter(function(e){return nameOf(e)===nm}).sort(function(a,b){return a.key.localeCompare(b.key)})}
 function openFolder(nm){try{history.pushState({f:1},"")}catch(x){}openF=nm;mode="";sel={};render();$("list").scrollTop=0}
-var recView="f",subSel=null,o2SchOpen=false;
+var recView="f",subSel=null,o2SchOpen=false,namesOpen=false,statFromRec=false;
 function schReady(){return typeof schList==="function"}
 function render(){
   if(openF!==null&&!folderRecs(openF).length){openF=null;mode="";sel={}}
@@ -771,15 +780,34 @@ function render(){
   acts();
   var L=$("list"),top=L.scrollTop;
   if(openF===null&&o2SchOpen&&schReady()){renderSchedFolder(L);return}
-  if(!saved.length&&!(schReady()&&schList().length)){L.innerHTML='<div class="empty">No records yet.</div>';return}
+  if(openF!==null&&!saved.length){L.innerHTML='<div class="empty">No records yet.</div>';return}
   L.innerHTML="";
   var g=document.createElement("div");g.className="tot grand";
   if(openF===null){
-    if(typeof C_TEAM==="undefined"&&schReady()&&(schList().length||syncOn()))L.appendChild(schFold());
+    var showRoot=!namesOpen;
+    if(showRoot&&typeof C_TEAM==="undefined"&&schReady()&&(schList().length||syncOn()))L.appendChild(schFold());
     var byName={};
     saved.forEach(function(e){var n=nameOf(e);(byName[n]=byName[n]||[]).push(e)});
     var order=Object.keys(byName).sort(function(a,b){if(a==="No name")return 1;if(b==="No name")return -1;return a.localeCompare(b)});
     var grand=0;
+    if(showRoot){
+      /* 12.32: STAT / Holidays folder right below Schedules */
+      var hl=holis(),hs=document.createElement("button");hs.type="button";hs.className="fold";
+      hs.innerHTML='<span class="ficon"><span>⭐</span></span><span class="fn"><b>STAT / Holidays</b><small></small></span><span class="chev">›</span>';
+      hs.querySelector(".fn small").textContent=hl.length?hl.length+" date"+(hl.length===1?"":"s")+" · shifts on these dates pay 1.5×":"None yet · tap to mark the paid holidays";
+      hs.onclick=function(){try{history.pushState({e:1},"")}catch(x){}statFromRec=true;recView="e";entSec="H";render()};
+      L.appendChild(hs);
+      /* 12.32: every staff member's records inside ONE Names folder */
+      var tH=0;order.forEach(function(nm){byName[nm].forEach(function(e){tH+=dur(e)})});
+      var nf=document.createElement("button");nf.type="button";nf.className="fold";
+      nf.innerHTML='<span class="ficon"><span>👥</span></span><span class="fn"><b>Names</b><small></small></span><span class="fh"></span><span class="chev">›</span>';
+      nf.querySelector(".fn small").textContent=order.length?order.length+" staff · "+saved.length+" record"+(saved.length===1?"":"s"):"No records yet";
+      nf.querySelector(".fh").textContent=order.length?fmtH(tH):"";
+      nf.onclick=function(){try{history.pushState({n:1},"")}catch(x){}namesOpen=true;render();$("list").scrollTop=0};
+      L.appendChild(nf);L.scrollTop=top;return;
+    }
+    $("backBtn").hidden=false;$("backBtn").textContent="‹ Records";$("recTitle").textContent="Names";
+    if(!order.length){var em=document.createElement("div");em.className="empty";em.textContent="No records yet.";L.appendChild(em);return}
     order.forEach(function(nm){
       var recs=byName[nm],h=0,days={};
       recs.forEach(function(e){h+=dur(e);days[e.date]=1});grand+=h;
@@ -804,9 +832,11 @@ function render(){
   g.innerHTML="<span></span><b></b>";g.firstChild.textContent=openF+" total";g.lastChild.textContent=fmtH(tot);L.appendChild(g);
   L.scrollTop=top;
 }
-window.addEventListener("popstate",function(){if(autoSec){autoSec=null;render();return}if(entSec){entSec=null;render();return}if(svName!==null){svName=null;render()}else if(openF!==null||svOpen!==null){svOpen=null;openF=null;mode="";sel={};render()}});
-$("backBtn").onclick=function(){if(o2SchOpen){o2SchOpen=false;render();return}if(autoSec){autoSec=null;render();return}if(entSec){entSec=null;render();return}svNsel=null;if(svName!==null){svName=null;render();return}svSel=null;svOpen=null;openF=null;mode="";sel={};render()};
-$("seg").onclick=function(e){var b=e.target.closest("button");if(!b)return;recView=b.dataset.v;entSec=null;autoSec=null;svOpen=null;svName=null;svSel=null;svNsel=null;if(recView==="s")subSel=null;mode="";sel={};render();$("list").scrollTop=0};
+window.addEventListener("popstate",function(){if(autoSec){autoSec=null;render();return}if(entSec&&statFromRec){statFromRec=false;entSec=null;recView="f";render();return}if(entSec){entSec=null;render();return}
+  if(recView==="f"&&openF===null&&namesOpen&&svName===null&&svOpen===null){namesOpen=false;render();return}if(svName!==null){svName=null;render()}else if(openF!==null||svOpen!==null){svOpen=null;openF=null;mode="";sel={};render()}});
+$("backBtn").onclick=function(){if(o2SchOpen){o2SchOpen=false;render();return}if(autoSec){autoSec=null;render();return}if(entSec&&statFromRec){statFromRec=false;entSec=null;recView="f";render();return}if(entSec){entSec=null;render();return}
+  if(recView==="f"&&openF===null&&namesOpen){namesOpen=false;render();return}svNsel=null;if(svName!==null){svName=null;render();return}svSel=null;svOpen=null;openF=null;mode="";sel={};render()};
+$("seg").onclick=function(e){var b=e.target.closest("button");if(!b)return;recView=b.dataset.v;entSec=null;namesOpen=false;statFromRec=false;autoSec=null;svOpen=null;svName=null;svSel=null;svNsel=null;if(recView==="s")subSel=null;mode="";sel={};render();$("list").scrollTop=0};
 function allNames(){var o={};saved.forEach(function(e){o[nameOf(e)]=1});return Object.keys(o).sort(function(a,b){if(a==="No name")return 1;if(b==="No name")return -1;return a.localeCompare(b)})}
 var MCFG_KEYS={subMode:1,subEmail:1,autoUrl:1,autoKey:1,autoNext:1,sherMode:1,sherEmail:1,bkMode:1,bkEmail:1};
 function mcfgRaw(){try{return JSON.parse(localStorage.getItem("mcfg")||"null")}catch(x){return null}}
@@ -1551,7 +1581,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.30 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.34 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2803,6 +2833,7 @@ function schCreate(rec){
   schLast=rec.name;return true;
 }
 function schLbl(e){var p=e.date.split("-"),d=new Date(p[0],p[1]-1,p[2]);return d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})+" · "+t12(e.from)+" – "+t12(e.to)+(overnight(e)?" (+1)":"")+" · "+String(e.floor||"").replace(" – "," ")+(e.comp?" · with "+e.comp:"")}
+setTimeout(function(){try{render()}catch(x){}},0);   /* 12.32: draw Records again once Schedules is ready */
 function schFold(){
   var L=schList().filter(function(x){return x.status!=="confirmed"}),na=L.filter(function(x){return !x.accAt}).length,nk=L.length-na;
   var f=document.createElement("button");f.type="button";f.className="fold schf "+(na?"alert":"ok");
@@ -2869,7 +2900,7 @@ var _schAp=syncApply;syncApply=function(){var r=_schAp.apply(this,arguments);try
 .chthread{flex:1;min-height:0;display:flex;flex-direction:column}
 .chthread[hidden],.chlist[hidden]{display:none!important}
 .chmsgs{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:6px 2px;display:flex;flex-direction:column}
-.chb .chimg{display:block;width:240px;max-width:100%;border-radius:14px;margin:6px 0 2px;cursor:zoom-in;box-shadow:0 4px 12px rgba(0,0,0,.12)} #chZoom{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:18px} #chZoom.on{display:flex} #chZoom img{max-width:100%;max-height:100%;border-radius:16px}  .chbar .chpb{flex:none;width:42px;height:42px;border:0;border-radius:50%;background:rgba(127,127,140,.14);font-size:20px;line-height:42px;padding:0;margin-right:6px;align-self:flex-end} .chb.ph{padding:4px;background:transparent!important;border:0!important} .chb .chphoto{display:block;width:230px;max-width:100%;border-radius:14px;cursor:zoom-in;background:#ddd;object-fit:cover} .chb .chphoto.ld{filter:blur(6px)} .chb .phs{font-size:12px;opacity:.7;margin-top:3px} .chb{max-width:80%;padding:8px 13px;border-radius:18px;margin:3px 0 1px;font-size:16px;line-height:1.32;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.chb .chimg{display:block;width:120px;max-width:100%;border-radius:8px;margin:6px 0 2px;cursor:zoom-in;box-shadow:0 4px 12px rgba(0,0,0,.12)} #chZoom{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:18px} #chZoom.on{display:flex} #chZoom img{max-width:100%;max-height:100%;border-radius:16px}  .chbar .chpb{flex:none;width:42px;height:42px;border:0;border-radius:50%;background:rgba(127,127,140,.14);font-size:20px;line-height:42px;padding:0;margin-right:6px;align-self:flex-end} .chb.ph{padding:4px;background:transparent!important;border:0!important} .chb .chphoto{display:block;width:230px;max-width:100%;border-radius:14px;cursor:zoom-in;background:#ddd;object-fit:cover} .chb .chphoto.ld{filter:blur(6px)} .chb .phs{font-size:12px;opacity:.7;margin-top:3px} .chb{max-width:80%;padding:8px 13px;border-radius:18px;margin:3px 0 1px;font-size:16px;line-height:1.32;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
 .chb.me{align-self:flex-end;background:#0a84ff;color:#fff;border-bottom-right-radius:6px}
 .chb.th{align-self:flex-start;background:var(--card);color:var(--text);border:1px solid var(--line);border-bottom-left-radius:6px}
 .cht{font-size:11px;color:var(--mute);margin:0 6px 5px}.cht.me{align-self:flex-end}.cht.th{align-self:flex-start}
@@ -3318,6 +3349,22 @@ var _rmRS=renderSync;renderSync=function(){var r=_rmRS.apply(this,arguments);try
     n.textContent="⛔ This device was removed from the team by another Main device. Ask that Main to allow it again (Device Sync → Removed devices → ↩︎), then turn Device Sync on here.";
     var host=$("syncBox");if(host)host.insertBefore(n,host.firstChild)}}catch(x){}return r};
 </script>
-<script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}</script>
+<script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}
+/* ===== 12.31 / 2.21: 🔄 Refresh app — gets the newest version from the same link (GitHub Pages) and restarts.
+   Your data (records, schedules, chat, sign-in) stays; only the app's stored copy is replaced. ===== */
+var RJ_VER="12.34";
+function rjRefresh(){
+  if(window.RJAndroid){try{toast("Android: install the new app file (APK) to update this app.")}catch(x){}return}
+  try{toast("Getting the newest version…",true)}catch(x){}
+  var done=false;function go(){if(done)return;done=true;var p=[];
+    try{if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)p.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}))}catch(x){}
+    try{if(window.caches&&caches.keys)p.push(caches.keys().then(function(ks){return Promise.all(ks.filter(function(k){return k!=="rj-photos"}).map(function(k){return caches.delete(k)}))}))}catch(x){}
+    Promise.all(p).catch(function(){}).then(function(){try{sessionStorage.setItem("rjUpd",RJ_VER)}catch(x){}location.replace(location.pathname+"?u="+Date.now()+location.hash)})}
+  try{(typeof syncPush==="function"&&typeof syncOn==="function"&&syncOn()?syncPush():Promise.resolve()).then(go,go)}catch(x){go()}
+  setTimeout(go,4000)}
+(function(){var prev=null;try{prev=sessionStorage.getItem("rjUpd");sessionStorage.removeItem("rjUpd")}catch(x){}
+  try{if(/[?&]u=\d+/.test(location.search))history.replaceState(history.state,"",location.pathname+location.hash)}catch(x){}
+  if(prev)setTimeout(function(){try{toast(prev!==RJ_VER?"✓ Updated to version "+RJ_VER:"✓ Refreshed — version "+RJ_VER+" is the newest",true)}catch(x){}},1500)})();
+</script>
 </body>
 </html>
