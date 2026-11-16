@@ -1595,7 +1595,7 @@ function selfTest(){
   var out=$("stRes");if(!out)return;var lines=[],bad=0;
   function put(ok,t){if(ok===false)bad++;lines.push((ok===true?"✅ ":ok===false?"❌ ":"• ")+t);out.textContent=lines.join("\n")}
   var url=lsGet("autoUrl",""),key=lsGet("autoKey","");
-  put(true,"App version 12.42 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
+  put(true,"App version 12.43 (Option 2)"+(window.RJAndroid?" (Android app)":" (iPhone / browser)")+(syncOn()?(syncFollower()?" · Other device":" · ⭐ Main"):""));
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url))put(false,"Sender link doesn't look right. It must be the Web app link that ends in /exec (Deploy → Manage deployments → copy Web app URL).");
   else put(true,"Sender link looks right (…"+url.slice(-14)+")");
   if(!key)put(false,"No secret key (built-in key missing).");
@@ -2970,8 +2970,8 @@ function chCardImg(c,id){
   function tx(t,x,y,sz,wt,col,al){g.font=(wt||"400")+" "+sz+"px "+F;g.fillStyle=col;g.textAlign=al||"left";g.textBaseline="alphabetic";g.fillText(t,x,y)}
   var gr=g.createLinearGradient(0,0,W,H);gr.addColorStop(0,"#dbe9ff");gr.addColorStop(1,"#f7e1f1");g.fillStyle=gr;g.fillRect(0,0,W,H);
   rr(18,18,W-36,H-36,26,"#ffffff");
-  var chg=c.k==="chg",hc=chg?"#ff9500":"#0a84ff";rr(18,18,W-36,64,26,hc);g.fillStyle=hc;g.fillRect(18,58,W-36,24);
-  tx(chg?"✏️  SHIFT CHANGED":"🗓️  NEW SHIFT",42,60,24,"800","#fff");
+  var chg=c.k==="chg",acc=c.k==="acc",hc=acc?"#34c759":chg?"#ff9500":"#0a84ff";rr(18,18,W-36,64,26,hc);g.fillStyle=hc;g.fillRect(18,58,W-36,24);
+  tx(acc?"✅  SHIFT ACCEPTED":chg?"✏️  SHIFT CHANGED":"🗓️  NEW SHIFT",42,60,24,"800","#fff");
   tx("RJ ShiftLog",W-42,60,18,"700","rgba(255,255,255,.9)","right");
   var e={date:c.date,from:c.from,to:c.to,floor:c.floor||"",comp:c.comp||""},p=String(c.date).split("-"),dt=new Date(+p[0],p[1]-1,+p[2]);
   tx(c.name||"",42,128,30,"800","#1c1c1e");
@@ -2988,11 +2988,11 @@ function chCardImg(c,id){
   if(e.comp){tx("👥 With "+e.comp,42,y,20,"600","#3a3a3c");y+=36}
   if(c.o){var o={date:c.o.date,from:c.o.from,to:c.o.to},op=String(o.date).split("-"),od=new Date(+op[0],op[1]-1,+op[2]),ot="";try{ot=t12(o.from)+" – "+t12(o.to)}catch(x){ot=o.from+" – "+o.to}
     var wt="Was: "+od.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})+" · "+ot;tx(wt,42,y,18,"500","#8e8e93");g.font="500 18px "+F;var w=g.measureText(wt).width;g.fillStyle="#8e8e93";g.fillRect(42,y-6,w,1.5);y+=36}
-  rr(42,y-4,W-84,58,16,"#f2f6ff");
+  rr(42,y-4,W-84,58,16,acc?"#e8f8ec":"#f2f6ff");
   var lo="";try{lo=schH12(e)}catch(x){lo=t12(e.from)}
-  tx("👍 Accept it in My Schedule  ·  ✓ Log opens at "+lo,W/2,y+32,18,"700","#0a6fd6","center");
+  tx((acc?"👍 Accepted  ·  ✓ Log opens at ":"👍 Accept it in My Schedule  ·  ✓ Log opens at ")+lo,W/2,y+32,18,"700",acc?"#1e8e3e":"#0a6fd6","center");
   var sent=c.at?new Date(c.at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
-  tx("Sent by "+(c.by||"the office")+(sent?" · "+sent:""),W/2,H-34,15,"500","#8e8e93","center");
+  tx((acc?"Accepted by ":"Sent by ")+(c.by||"the office")+(sent?" · "+sent:""),W/2,H-34,15,"500","#8e8e93","center");
   var u="";try{u=cv.toDataURL("image/png")}catch(x){}
   if(id)chCardCache[id]=u;return u}
 function chZoom(src){var z=document.getElementById("chZoom");if(!z){z=document.createElement("div");z.id="chZoom";z.onclick=function(){z.classList.remove("on")};z.innerHTML='<img alt="Shift">';document.body.appendChild(z)}
@@ -3377,7 +3377,7 @@ var _rmRS=renderSync;renderSync=function(){var r=_rmRS.apply(this,arguments);try
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){navigator.serviceWorker.register("sw.js").catch(function(){})}
 /* ===== 12.31 / 2.21: 🔄 Refresh app — gets the newest version from the same link (GitHub Pages) and restarts.
    Your data (records, schedules, chat, sign-in) stays; only the app's stored copy is replaced. ===== */
-var RJ_VER="12.42";
+var RJ_VER="12.43";
 function rjRefresh(){
   if(window.RJAndroid){try{toast("Android: install the new app file (APK) to update this app.")}catch(x){}return}
   try{toast("Getting the newest version…",true)}catch(x){}
